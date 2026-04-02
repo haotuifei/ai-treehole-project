@@ -1,0 +1,72 @@
+spring:
+  application:
+    name: treehole-server
+  profiles:
+    active: dev
+
+  jackson:
+    time-zone: Asia/Shanghai
+    date-format: yyyy-MM-dd HH:mm:ss
+    serialization:
+      write-dates-as-timestamps: false
+
+# JWT（生产环境请用环境变量覆盖 secret）
+app:
+  ai:
+    provider: mock
+    api-base: https://api.deepseek.com
+    api-key: ${AI_API_KEY:}
+    model: deepseek-chat
+    connect-timeout-ms: 30000
+    read-timeout-ms: 300000
+    max-context-messages: 24
+    persona:
+      system-prompt-file: classpath:prompts/treehole-persona.txt
+      system-prompt: ""
+    risk:
+      enabled: true
+      safe-reply-text: ""
+      safe-reply-file: classpath:prompts/safe-reply-high-risk.txt
+      high-keywords:
+        - 自杀
+        - 自殺
+        - 结束生命
+        - 不想活了
+        - 去死
+        - 自残
+        - 割腕
+        - 跳楼
+        - 烧炭
+        - 安乐死
+        - 杀了
+        - 杀人
+        - 同归于尽
+  jwt:
+    secret: ${JWT_SECRET:treehole-dev-secret-change-me-in-production-min-32-chars!!}
+    expiration-ms: 86400000
+    header: Authorization
+    prefix: "Bearer "
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  global-config:
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+
+logging:
+  level:
+    root: INFO
+    com.zxw.treehole: DEBUG

@@ -1,0 +1,55 @@
+/**
+ * 治愈系主题：柔和、留白、低对比
+ */
+:root {
+  --th-bg: #f6f4f1;
+  --th-surface: #fffcf8;
+  --th-card: #ffffff;
+  --th-text: #3d3a36;
+  --th-text-muted: #8a8580;
+  --th-primary: #7c9a82;
+  --th-primary-soft: #e8f0e9;
+  --th-accent: #c4a77d;
+  --th-border: #e8e4de;
+  --th-radius: 14px;
+  --th-radius-sm: 10px;
+  --th-shadow: 0 8px 32px rgba(61, 58, 54, 0.06);
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  color: var(--th-text);
+  background: var(--th-bg);
+}
+
+.th-page {
+  padding: 20px 24px 32px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.th-page-title {
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  margin: 0 0 6px;
+  color: var(--th-text);
+}
+
+.th-page-desc {
+  font-size: 0.9rem;
+  color: var(--th-text-muted);
+  margin: 0 0 20px;
+}
+
+.th-card {
+  background: var(--th-card);
+  border-radius: var(--th-radius);
+  border: 1px solid var(--th-border);
+  box-shadow: var(--th-shadow);
+  padding: 20px;
+}
