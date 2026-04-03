@@ -1,8 +1,16 @@
 <template>
   <el-container class="layout-root">
-    <el-aside :style="{ width: collapsed ? '0px' : '220px' }" class="aside">
-      <div v-show="!collapsed" class="aside-inner">
-        <div class="brand" @click="$router.push('/home')">
+    <div 
+      v-if="isMobile && !collapsed" 
+      class="sidebar-overlay" 
+      @click="app.closeSidebar"
+    />
+    <el-aside 
+      :class="['aside', { 'aside-mobile': isMobile, 'aside-open': !collapsed }]" 
+      :style="asideStyle"
+    >
+      <div class="aside-inner">
+        <div class="brand" @click="handleBrandClick">
           <span class="brand-dot" />
           <span class="brand-text">树洞</span>
         </div>
@@ -15,6 +23,7 @@
             background-color="transparent"
             text-color="var(--th-text)"
             active-text-color="var(--th-primary)"
+            @select="handleMenuSelect"
           >
             <el-menu-item index="/home">
               <el-icon><House /></el-icon>
@@ -129,7 +138,15 @@ const user = useUserStore()
 const app = useAppStore()
 
 const collapsed = computed(() => app.sidebarCollapsed)
+const isMobile = computed(() => app.isMobile)
 const activeMenu = computed(() => route.path)
+
+const asideStyle = computed(() => {
+  if (isMobile.value) {
+    return {}
+  }
+  return { width: collapsed.value ? '0px' : '220px' }
+})
 
 const displayName = computed(
   () => user.profile?.realName || user.profile?.username || '访客'
@@ -139,6 +156,19 @@ const headerTitle = computed(() => {
   const m = route.meta?.title
   return m ? String(m) : ''
 })
+
+function handleBrandClick() {
+  router.push('/home')
+  if (isMobile.value) {
+    app.closeSidebar()
+  }
+}
+
+function handleMenuSelect() {
+  if (isMobile.value) {
+    app.closeSidebar()
+  }
+}
 
 function onLogout() {
   user.logout()
@@ -151,6 +181,23 @@ function onLogout() {
   min-height: 100vh;
   background: var(--th-bg);
 }
+
+.sidebar-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 99;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 .aside {
   background: var(--th-surface);
   border-right: 1px solid var(--th-border);
@@ -158,6 +205,24 @@ function onLogout() {
   overflow: hidden;
   flex-shrink: 0;
 }
+
+.aside-mobile {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 220px;
+  z-index: 100;
+  transform: translateX(-100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: none;
+}
+
+.aside-mobile.aside-open {
+  transform: translateX(0);
+  box-shadow: 4px 0 12px rgba(0, 0, 0, 0.15);
+}
+
 .aside-inner {
   width: 220px;
   height: 100vh;
@@ -165,6 +230,7 @@ function onLogout() {
   flex-direction: column;
   overflow: hidden;
 }
+
 .brand {
   display: flex;
   align-items: center;
@@ -175,6 +241,7 @@ function onLogout() {
   color: var(--th-text);
   flex-shrink: 0;
 }
+
 .brand-dot {
   width: 12px;
   height: 12px;
@@ -182,17 +249,21 @@ function onLogout() {
   background: linear-gradient(135deg, var(--th-primary), var(--th-accent));
   flex-shrink: 0;
 }
+
 .brand-text {
   font-size: 1.1rem;
   letter-spacing: 0.08em;
 }
+
 .menu-scrollbar {
   flex: 1;
   overflow: hidden;
 }
+
 .menu-scrollbar :deep(.el-scrollbar__wrap) {
   overflow-x: hidden;
 }
+
 .menu-group {
   padding: 14px 20px 6px;
   font-size: 11px;
@@ -200,29 +271,37 @@ function onLogout() {
   letter-spacing: 0.12em;
   color: var(--th-text-muted);
 }
+
 .th-menu {
   border-right: none !important;
   padding-bottom: 24px;
 }
+
 .th-menu:not(.el-menu--collapse) {
   width: 220px;
 }
+
 .th-menu :deep(.el-menu-item) {
   border-radius: var(--th-radius-sm);
   margin: 4px 10px;
   height: 42px;
 }
+
 .th-menu :deep(.el-menu-item .el-menu-item__icon-wrapper) {
   margin-right: 10px;
 }
+
 .th-menu :deep(.el-menu-item.is-active) {
   background: var(--th-primary-soft) !important;
   font-weight: 600;
 }
+
 .main-wrap {
   min-width: 0;
   flex: 1;
+  width: 100%;
 }
+
 .header {
   height: 56px !important;
   display: flex;
@@ -233,28 +312,47 @@ function onLogout() {
   border-bottom: 1px solid var(--th-border);
   flex-shrink: 0;
 }
+
 .collapse-btn {
   font-size: 18px;
   color: var(--th-text-muted);
 }
+
 .header-title {
   flex: 1;
   font-size: 15px;
   color: var(--th-text-muted);
 }
+
 .header-right {
   display: flex;
   align-items: center;
   gap: 12px;
 }
+
 .who {
   font-size: 14px;
   color: var(--th-text);
 }
+
 .main {
   padding: 0;
   background: var(--th-bg);
   min-height: calc(100vh - 56px);
   overflow-x: hidden;
+}
+
+@media (max-width: 768px) {
+  .header {
+    padding: 0 12px;
+  }
+  
+  .header-title {
+    font-size: 14px;
+  }
+  
+  .who {
+    display: none;
+  }
 }
 </style>

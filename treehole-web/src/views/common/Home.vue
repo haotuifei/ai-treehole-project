@@ -1,7 +1,7 @@
 <template>
   <div class="page">
     <div class="top-bar">
-      <div>
+      <div class="title-group">
         <h2 class="chat-title">AI 树洞</h2>
         <p class="chat-sub">慢慢说，我会认真听。</p>
       </div>
@@ -42,17 +42,16 @@
             :disabled="sending || !user.isLoggedIn"
             @keydown.enter.exact.prevent="send"
           />
-          <div class="actions">
-            <el-button
-              type="primary"
-              round
-              :loading="sending"
-              :disabled="!user.isLoggedIn || !draft.trim()"
-              @click="send"
-            >
-              发送
-            </el-button>
-          </div>
+          <el-button
+            class="send-btn"
+            type="primary"
+            round
+            :loading="sending"
+            :disabled="!user.isLoggedIn || !draft.trim()"
+            @click="send"
+          >
+            发送
+          </el-button>
         </div>
       </div>
     </div>
@@ -143,7 +142,9 @@ async function send() {
   display: flex;
   flex-direction: column;
   height: calc(100vh - 56px);
-  padding: 20px 24px 0;
+  padding: 20px 24px;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 .top-bar {
   display: flex;
@@ -152,6 +153,9 @@ async function send() {
   padding-bottom: 16px;
   flex-shrink: 0;
 }
+.title-group {
+  margin-left: 24px;
+}
 .chat-title {
   margin: 0;
   font-size: 1.25rem;
@@ -159,9 +163,14 @@ async function send() {
   color: var(--th-text);
 }
 .chat-sub {
-  margin: 4px 0 0;
-  font-size: 0.9rem;
+  margin: 6px 0 0;
+  font-size: 0.95rem;
   color: var(--th-text-muted);
+  font-family: 'Georgia', 'Times New Roman', 'Noto Serif SC', serif;
+  font-style: italic;
+  letter-spacing: 0.08em;
+  line-height: 1.6;
+  opacity: 0.85;
 }
 .top-actions {
   display: flex;
@@ -274,19 +283,20 @@ async function send() {
 }
 .composer-area {
   flex-shrink: 0;
-  padding: 16px 8px 24px;
+  padding: 12px 0 0;
   background: linear-gradient(to top, var(--th-bg) 80%, transparent);
 }
 .composer {
   max-width: 720px;
   margin: 0 auto;
+  position: relative;
 }
 .composer :deep(.el-textarea__inner) {
   background: rgba(255, 255, 255, 0.6);
   backdrop-filter: blur(8px);
   border: 1px solid var(--th-border);
   border-radius: 16px;
-  padding: 14px 16px;
+  padding: 14px 90px 14px 16px;
   resize: none;
   box-shadow: 0 4px 20px rgba(61, 58, 54, 0.04);
   font-size: 15px;
@@ -302,6 +312,12 @@ async function send() {
   color: var(--th-text-muted);
   opacity: 0.6;
 }
+.send-btn {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 2;
+}
 .actions {
   margin-top: 12px;
   display: flex;
@@ -309,7 +325,9 @@ async function send() {
 }
 @media (max-width: 768px) {
   .page {
-    padding: 16px 12px 0;
+    padding: 16px 12px;
+    box-sizing: border-box;
+    overflow: hidden;
   }
   .bubble-content {
     max-width: 90%;
