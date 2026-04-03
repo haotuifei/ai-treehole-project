@@ -9,44 +9,30 @@
         <el-button v-if="!user.isLoggedIn" type="primary" round plain @click="$router.push('/login')">
           去登录
         </el-button>
-        <template v-else>
-          <el-button round @click="loadSessions">刷新会话</el-button>
-          <el-button type="primary" round @click="newSession">新对话</el-button>
-        </template>
+        <el-button v-else type="primary" round @click="clearSession">新对话</el-button>
       </div>
     </div>
 
-    <div class="body">
-      <aside class="sessions th-card">
-        <el-scrollbar height="calc(100vh - 200px)">
-          <div
-            v-for="s in sessions"
-            :key="s.id"
-            :class="['sess-item', { active: s.id === sessionId }]"
-            @click="selectSession(s)"
-          >
-            <div class="sess-title">{{ s.title || '未命名' }}</div>
-            <div class="sess-time">{{ formatTime(s.lastMessageAt) }}</div>
-          </div>
-          <el-empty v-if="!sessions.length && user.isLoggedIn" description="暂无会话" :image-size="72" />
-        </el-scrollbar>
-      </aside>
-
-      <main class="chat th-card">
-        <el-scrollbar ref="scrollRef" height="calc(100vh - 280px)">
-          <div class="msgs">
-            <div v-for="(m, i) in messages" :key="i" :class="['bubble', m.role]">
-              <div class="role-label">{{ m.role === 'user' ? '我' : '陪伴者' }}</div>
-              <div class="text">{{ m.content }}<span v-if="m.streaming" class="cursor">▍</span></div>
+    <div class="chat-area">
+      <el-scrollbar ref="scrollRef" class="msg-scroll">
+        <div class="msgs">
+          <div v-for="(m, i) in messages" :key="i" :class="['bubble', m.role]">
+            <div class="bubble-content">
+              <span class="role-tag">{{ m.role === 'user' ? '我' : '陪伴者' }}</span>
+              <p class="text">{{ m.content }}<span v-if="m.streaming" class="cursor">▍</span></p>
             </div>
-            <el-empty
-              v-if="!messages.length"
-              description="在下方输入想说的话，支持流式回复"
-              :image-size="80"
-            />
           </div>
-        </el-scrollbar>
+          <div v-if="!messages.length && !sending" class="empty-state">
+            <p class="empty-text">在下方输入想说的话</p>
+            <p class="empty-sub">支持流式回复，我会认真倾听你的每一句话</p>
+          </div>
+          <div v-if="sending && !messages.length" class="empty-state">
+            <p class="empty-text">正在思考...</p>
+          </div>
+        </div>
+      </el-scrollbar>
 
+      <div class="composer-area">
         <div class="composer">
           <el-input
             v-model="draft"
@@ -68,73 +54,27 @@
             </el-button>
           </div>
         </div>
-      </main>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, nextTick, onMounted, watch } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
-import { http } from '../../api/http'
 import { streamChat } from '../../api/chat'
 import { useUserStore } from '../../stores/user'
 
 const user = useUserStore()
 const hasToken = computed(() => user.isLoggedIn)
 
-const sessions = ref([])
-const sessionId = ref(null)
 const messages = ref([])
 const draft = ref('')
 const sending = ref(false)
 const scrollRef = ref(null)
 
-function formatTime(t) {
-  if (!t) return ''
-  return t.replace('T', ' ').slice(0, 16)
-}
-
-async function loadSessions() {
-  if (!hasToken.value) return
-  try {
-    const { data } = await http.get('/student/chat/sessions')
-    if (data.code === 200) {
-      sessions.value = data.data || []
-    }
-  } catch (e) {
-    ElMessage.error(e?.response?.data?.message || '加载会话失败')
-  }
-}
-
-function newSession() {
-  sessionId.value = null
+function clearSession() {
   messages.value = []
-}
-
-async function selectSession(s) {
-  sessionId.value = s.id
-  await loadHistory()
-}
-
-async function loadHistory() {
-  if (!sessionId.value) return
-  try {
-    const { data } = await http.get(`/student/chat/sessions/${sessionId.value}/messages`, {
-      params: { pageNum: 1, pageSize: 100 }
-    })
-    if (data.code !== 200) return
-    const page = data.data
-    const rows = page?.records || []
-    messages.value = rows.map((r) => ({
-      role: r.role,
-      content: r.content || '',
-      streaming: false
-    }))
-    scrollBottom()
-  } catch {
-    ElMessage.error('加载历史失败')
-  }
 }
 
 function scrollBottom() {
@@ -156,10 +96,8 @@ async function send() {
 
   try {
     await streamChat({
-      sessionId: sessionId.value,
       content: text,
       onMeta: (meta) => {
-        if (meta?.sessionId) sessionId.value = meta.sessionId
         if (meta?.riskLevel === 'HIGH') {
           ElMessage.warning('检测到高风险表述，已启用安全回复并记录预警')
         }
@@ -174,7 +112,6 @@ async function send() {
         const m = messages.value[assistantIndex]
         if (m) m.streaming = false
         scrollBottom()
-        loadSessions()
       },
       onError: (msg) => {
         ElMessage.error(msg || '流式输出错误')
@@ -199,41 +136,30 @@ async function send() {
     scrollBottom()
   }
 }
-
-onMounted(() => {
-  if (hasToken.value) loadSessions()
-})
-
-watch(hasToken, (v) => {
-  if (v) loadSessions()
-  else {
-    sessions.value = []
-    sessionId.value = null
-    messages.value = []
-  }
-})
 </script>
 
 <style scoped>
 .page {
-  padding: 16px 20px 24px;
-  max-width: 1100px;
-  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 56px);
+  padding: 20px 24px 0;
 }
 .top-bar {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-  margin-bottom: 16px;
+  align-items: center;
+  padding-bottom: 16px;
+  flex-shrink: 0;
 }
 .chat-title {
   margin: 0;
   font-size: 1.25rem;
   font-weight: 600;
+  color: var(--th-text);
 }
 .chat-sub {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   font-size: 0.9rem;
   color: var(--th-text-muted);
 }
@@ -242,94 +168,155 @@ watch(hasToken, (v) => {
   gap: 8px;
   flex-shrink: 0;
 }
-.body {
-  display: flex;
-  gap: 16px;
-  min-height: 0;
-}
-.sessions {
-  width: 260px;
-  flex-shrink: 0;
-  padding: 12px;
-}
-.sess-item {
-  padding: 10px 12px;
-  border-radius: var(--th-radius-sm);
-  cursor: pointer;
-  margin-bottom: 6px;
-  border: 1px solid transparent;
-}
-.sess-item:hover {
-  background: var(--th-primary-soft);
-}
-.sess-item.active {
-  border-color: var(--th-primary);
-  background: var(--th-primary-soft);
-}
-.sess-title {
-  font-size: 14px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.sess-time {
-  font-size: 12px;
-  color: var(--th-text-muted);
-  margin-top: 4px;
-}
-.chat {
+.chat-area {
   flex: 1;
-  min-width: 0;
   display: flex;
   flex-direction: column;
-  padding: 16px;
+  min-height: 0;
+}
+.msg-scroll {
+  flex: 1;
+  overflow: hidden;
+}
+.msg-scroll :deep(.el-scrollbar__wrap) {
+  overflow-x: hidden;
+  padding-bottom: 16px;
+}
+.msg-scroll :deep(.el-scrollbar__view) {
+  height: 100%;
 }
 .msgs {
   max-width: 720px;
   margin: 0 auto;
-  padding-bottom: 12px;
+  padding: 0 8px;
 }
 .bubble {
-  margin-bottom: 14px;
-  padding: 12px 14px;
-  border-radius: var(--th-radius-sm);
-  line-height: 1.65;
+  margin-bottom: 20px;
+  animation: fadeIn 0.3s ease;
+  display: flex;
 }
 .bubble.user {
-  background: var(--th-primary-soft);
-  margin-left: 40px;
+  justify-content: flex-end;
 }
 .bubble.assistant {
-  background: #f3f1ed;
-  border: 1px solid var(--th-border);
-  margin-right: 40px;
+  justify-content: flex-start;
 }
-.role-label {
-  font-size: 12px;
-  color: var(--th-text-muted);
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.bubble-content {
+  display: inline-block;
+  max-width: 80%;
+  padding: 14px 18px;
+  border-radius: 18px;
+  line-height: 1.65;
+}
+.bubble.user .bubble-content {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(232, 228, 222, 0.9);
+  color: var(--th-text);
+  border-bottom-right-radius: 4px;
+}
+.bubble.assistant .bubble-content {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(232, 228, 222, 0.9);
+  color: var(--th-text);
+  border-bottom-left-radius: 4px;
+}
+.role-tag {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
   margin-bottom: 6px;
+  opacity: 0.6;
 }
 .text {
+  margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
 }
 .cursor {
+  display: inline-block;
   animation: blink 1s step-end infinite;
   color: var(--th-primary);
+  font-weight: 100;
 }
 @keyframes blink {
   50% {
     opacity: 0;
   }
 }
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--th-text-muted);
+}
+.empty-text {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  color: var(--th-text-muted);
+}
+.empty-sub {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--th-text-muted);
+  opacity: 0.7;
+}
+.composer-area {
+  flex-shrink: 0;
+  padding: 16px 8px 24px;
+  background: linear-gradient(to top, var(--th-bg) 80%, transparent);
+}
 .composer {
   max-width: 720px;
-  margin: 12px auto 0;
-  width: 100%;
+  margin: 0 auto;
+}
+.composer :deep(.el-textarea__inner) {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--th-border);
+  border-radius: 16px;
+  padding: 14px 16px;
+  resize: none;
+  box-shadow: 0 4px 20px rgba(61, 58, 54, 0.04);
+  font-size: 15px;
+  line-height: 1.6;
+  transition: all 0.2s ease;
+}
+.composer :deep(.el-textarea__inner:focus) {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: var(--th-primary);
+  box-shadow: 0 4px 24px rgba(124, 154, 130, 0.15);
+}
+.composer :deep(.el-textarea__inner::placeholder) {
+  color: var(--th-text-muted);
+  opacity: 0.6;
 }
 .actions {
-  margin-top: 10px;
+  margin-top: 12px;
   display: flex;
   justify-content: flex-end;
+}
+@media (max-width: 768px) {
+  .page {
+    padding: 16px 12px 0;
+  }
+  .bubble-content {
+    max-width: 90%;
+    padding: 12px 14px;
+  }
+  .empty-state {
+    padding: 40px 16px;
+  }
 }
 </style>

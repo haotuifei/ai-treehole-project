@@ -22,6 +22,8 @@
         </el-button>
       </el-form>
     </div>
+
+    <WelcomeTransition :visible="showWelcome" :username="form.username" @complete="onWelcomeComplete" />
   </div>
 </template>
 
@@ -30,6 +32,7 @@ import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '../../stores/user'
+import WelcomeTransition from '../../components/common/WelcomeTransition.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -37,6 +40,9 @@ const user = useUserStore()
 
 const formRef = ref()
 const loading = ref(false)
+const showWelcome = ref(false)
+const redirectPath = ref('/home')
+
 const form = reactive({
   username: '',
   password: ''
@@ -52,14 +58,20 @@ async function onSubmit() {
   loading.value = true
   try {
     await user.login({ username: form.username, password: form.password })
-    ElMessage.success('登录成功')
     const redir = route.query.redirect
-    router.push(typeof redir === 'string' && redir.startsWith('/') ? redir : '/home')
+    redirectPath.value = typeof redir === 'string' && redir.startsWith('/') ? redir : '/home'
+    showWelcome.value = true
   } catch (e) {
-    ElMessage.error(e?.message || '登录失败')
+    const msg = e?.response?.data?.message || e?.message || '登录失败'
+    ElMessage.error(msg)
   } finally {
     loading.value = false
   }
+}
+
+function onWelcomeComplete() {
+  showWelcome.value = false
+  router.push(redirectPath.value)
 }
 </script>
 

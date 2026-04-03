@@ -40,12 +40,6 @@ const routes = [
         component: () => import('../views/student/Checkin.vue')
       },
       {
-        path: 'student/treehole',
-        name: 'StudentTreehole',
-        meta: { title: 'AI 树洞', roles: ['STUDENT'] },
-        component: () => import('../views/student/TreeholeChat.vue')
-      },
-      {
         path: 'student/emotion',
         name: 'StudentEmotion',
         meta: { title: '情绪档案', roles: ['STUDENT'] },

@@ -1,56 +1,96 @@
 <template>
   <el-container class="layout-root">
-    <el-aside :width="collapsed ? '72px' : '220px'" class="aside">
-      <div class="brand" @click="$router.push('/home')">
-        <span class="brand-dot" />
-        <span v-show="!collapsed" class="brand-text">树洞</span>
+    <el-aside :style="{ width: collapsed ? '0px' : '220px' }" class="aside">
+      <div v-show="!collapsed" class="aside-inner">
+        <div class="brand" @click="$router.push('/home')">
+          <span class="brand-dot" />
+          <span class="brand-text">树洞</span>
+        </div>
+        <el-scrollbar class="menu-scrollbar">
+          <el-menu
+            :default-active="activeMenu"
+            :collapse="false"
+            router
+            class="th-menu"
+            background-color="transparent"
+            text-color="var(--th-text)"
+            active-text-color="var(--th-primary)"
+          >
+            <el-menu-item index="/home">
+              <el-icon><House /></el-icon>
+              <template #title>首页</template>
+            </el-menu-item>
+            <el-menu-item index="/profile">
+              <el-icon><User /></el-icon>
+              <template #title>个人中心</template>
+            </el-menu-item>
+
+            <template v-if="user.isStudent()">
+              <div class="menu-group">学生</div>
+              <el-menu-item index="/student/goals">
+                <el-icon><Place /></el-icon>
+                <template #title>目标管理</template>
+              </el-menu-item>
+              <el-menu-item index="/student/checkin">
+                <el-icon><Calendar /></el-icon>
+                <template #title>学习打卡</template>
+              </el-menu-item>
+              <el-menu-item index="/student/emotion">
+                <el-icon><Collection /></el-icon>
+                <template #title>情绪档案</template>
+              </el-menu-item>
+              <el-menu-item index="/student/history">
+                <el-icon><Clock /></el-icon>
+                <template #title>历史记录</template>
+              </el-menu-item>
+            </template>
+
+            <template v-if="user.isCounselor()">
+              <div class="menu-group">辅导员</div>
+              <el-menu-item index="/counselor/students">
+                <el-icon><User /></el-icon>
+                <template #title>学生档案</template>
+              </el-menu-item>
+              <el-menu-item index="/counselor/warnings">
+                <el-icon><Warning /></el-icon>
+                <template #title>情绪预警</template>
+              </el-menu-item>
+              <el-menu-item index="/counselor/interventions">
+                <el-icon><Notebook /></el-icon>
+                <template #title>干预记录</template>
+              </el-menu-item>
+              <el-menu-item index="/counselor/class-analytics">
+                <el-icon><DataLine /></el-icon>
+                <template #title>班级数据</template>
+              </el-menu-item>
+            </template>
+
+            <template v-if="user.isAdmin()">
+              <div class="menu-group">管理</div>
+              <el-menu-item index="/admin/users">
+                <el-icon><UserFilled /></el-icon>
+                <template #title>用户管理</template>
+              </el-menu-item>
+              <el-menu-item index="/admin/models">
+                <el-icon><Setting /></el-icon>
+                <template #title>模型配置</template>
+              </el-menu-item>
+              <el-menu-item index="/admin/alert-rules">
+                <el-icon><Bell /></el-icon>
+                <template #title>预警规则</template>
+              </el-menu-item>
+              <el-menu-item index="/admin/logs">
+                <el-icon><Document /></el-icon>
+                <template #title>系统日志</template>
+              </el-menu-item>
+              <el-menu-item index="/admin/dashboard">
+                <el-icon><DataBoard /></el-icon>
+                <template #title>数据大屏</template>
+              </el-menu-item>
+            </template>
+          </el-menu>
+        </el-scrollbar>
       </div>
-      <el-scrollbar>
-        <el-menu
-          :default-active="activeMenu"
-          :collapse="collapsed"
-          router
-          class="th-menu"
-          background-color="transparent"
-          text-color="var(--th-text)"
-          active-text-color="var(--th-primary)"
-        >
-          <el-menu-item index="/home">
-            <el-icon><House /></el-icon>
-            <template #title>首页</template>
-          </el-menu-item>
-          <el-menu-item index="/profile">
-            <el-icon><User /></el-icon>
-            <template #title>个人中心</template>
-          </el-menu-item>
-
-          <template v-if="user.isStudent()">
-            <div v-show="!collapsed" class="menu-group">学生</div>
-            <el-menu-item index="/student/goals">目标管理</el-menu-item>
-            <el-menu-item index="/student/checkin">学习打卡</el-menu-item>
-            <el-menu-item index="/student/treehole">AI 树洞</el-menu-item>
-            <el-menu-item index="/student/emotion">情绪档案</el-menu-item>
-            <el-menu-item index="/student/history">历史记录</el-menu-item>
-          </template>
-
-          <template v-if="user.isCounselor()">
-            <div v-show="!collapsed" class="menu-group">辅导员</div>
-            <el-menu-item index="/counselor/students">学生档案</el-menu-item>
-            <el-menu-item index="/counselor/warnings">情绪预警</el-menu-item>
-            <el-menu-item index="/counselor/interventions">干预记录</el-menu-item>
-            <el-menu-item index="/counselor/class-analytics">班级数据</el-menu-item>
-          </template>
-
-          <template v-if="user.isAdmin()">
-            <div v-show="!collapsed" class="menu-group">管理</div>
-            <el-menu-item index="/admin/users">用户管理</el-menu-item>
-            <el-menu-item index="/admin/models">模型配置</el-menu-item>
-            <el-menu-item index="/admin/alert-rules">预警规则</el-menu-item>
-            <el-menu-item index="/admin/logs">系统日志</el-menu-item>
-            <el-menu-item index="/admin/dashboard">数据大屏</el-menu-item>
-          </template>
-        </el-menu>
-      </el-scrollbar>
     </el-aside>
 
     <el-container direction="vertical" class="main-wrap">
@@ -74,7 +114,12 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { House, User, Fold, Expand } from '@element-plus/icons-vue'
+import {
+  House, User, Fold, Expand,
+  Place, Calendar, Collection, Clock,
+  Warning, Notebook, DataLine,
+  UserFilled, Setting, Bell, Document, DataBoard
+} from '@element-plus/icons-vue'
 import { useUserStore } from '../../stores/user'
 import { useAppStore } from '../../stores/app'
 
@@ -109,7 +154,16 @@ function onLogout() {
 .aside {
   background: var(--th-surface);
   border-right: 1px solid var(--th-border);
-  transition: width 0.2s ease;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.aside-inner {
+  width: 220px;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 .brand {
   display: flex;
@@ -119,6 +173,7 @@ function onLogout() {
   cursor: pointer;
   font-weight: 600;
   color: var(--th-text);
+  flex-shrink: 0;
 }
 .brand-dot {
   width: 12px;
@@ -131,6 +186,13 @@ function onLogout() {
   font-size: 1.1rem;
   letter-spacing: 0.08em;
 }
+.menu-scrollbar {
+  flex: 1;
+  overflow: hidden;
+}
+.menu-scrollbar :deep(.el-scrollbar__wrap) {
+  overflow-x: hidden;
+}
 .menu-group {
   padding: 14px 20px 6px;
   font-size: 11px;
@@ -142,10 +204,16 @@ function onLogout() {
   border-right: none !important;
   padding-bottom: 24px;
 }
+.th-menu:not(.el-menu--collapse) {
+  width: 220px;
+}
 .th-menu :deep(.el-menu-item) {
   border-radius: var(--th-radius-sm);
   margin: 4px 10px;
   height: 42px;
+}
+.th-menu :deep(.el-menu-item .el-menu-item__icon-wrapper) {
+  margin-right: 10px;
 }
 .th-menu :deep(.el-menu-item.is-active) {
   background: var(--th-primary-soft) !important;
@@ -153,6 +221,7 @@ function onLogout() {
 }
 .main-wrap {
   min-width: 0;
+  flex: 1;
 }
 .header {
   height: 56px !important;
@@ -162,6 +231,7 @@ function onLogout() {
   padding: 0 20px;
   background: var(--th-surface);
   border-bottom: 1px solid var(--th-border);
+  flex-shrink: 0;
 }
 .collapse-btn {
   font-size: 18px;
@@ -185,5 +255,6 @@ function onLogout() {
   padding: 0;
   background: var(--th-bg);
   min-height: calc(100vh - 56px);
+  overflow-x: hidden;
 }
 </style>
