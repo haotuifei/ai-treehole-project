@@ -42,7 +42,7 @@ const routes = [
       {
         path: 'student/emotion',
         name: 'StudentEmotion',
-        meta: { title: '情绪档案', roles: ['STUDENT'] },
+        meta: { title: 'Psychological SO', roles: ['STUDENT'] },
         component: () => import('../views/student/EmotionArchive.vue')
       },
       {

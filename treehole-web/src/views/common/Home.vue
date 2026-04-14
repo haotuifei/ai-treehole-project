@@ -16,19 +16,24 @@
     <div class="chat-area">
       <el-scrollbar ref="scrollRef" class="msg-scroll">
         <div class="msgs">
-          <div v-for="(m, i) in messages" :key="i" :class="['bubble', m.role]">
-            <div class="bubble-content">
-              <span class="role-tag">{{ m.role === 'user' ? '我' : '陪伴者' }}</span>
-              <p class="text">{{ m.content }}<span v-if="m.streaming" class="cursor">▍</span></p>
+          <div v-if="loadingHistory" class="empty-state">
+            <p class="empty-text">加载历史消息...</p>
+          </div>
+          <template v-else>
+            <div v-for="(m, i) in messages" :key="i" :class="['bubble', m.role]">
+              <div class="bubble-content">
+                <span class="role-tag">{{ m.role === 'user' ? '我' : '陪伴者' }}</span>
+                <p class="text">{{ m.content }}<span v-if="m.streaming" class="cursor">▍</span></p>
+              </div>
             </div>
-          </div>
-          <div v-if="!messages.length && !sending" class="empty-state">
-            <p class="empty-text">在下方输入想说的话</p>
-            <p class="empty-sub">支持流式回复，我会认真倾听你的每一句话</p>
-          </div>
-          <div v-if="sending && !messages.length" class="empty-state">
-            <p class="empty-text">正在思考...</p>
-          </div>
+            <div v-if="!messages.length && !sending" class="empty-state">
+              <p class="empty-text">在下方输入想说的话</p>
+              <p class="empty-sub">支持流式回复，我会认真倾听你的每一句话</p>
+            </div>
+            <div v-if="sending && !messages.length" class="empty-state">
+              <p class="empty-text">正在思考...</p>
+            </div>
+          </template>
         </div>
       </el-scrollbar>
 
@@ -59,21 +64,61 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, nextTick, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { streamChat } from '../../api/chat'
+import { streamChat, getSessionMessages } from '../../api/chat'
 import { useUserStore } from '../../stores/user'
 
 const user = useUserStore()
+const route = useRoute()
+const router = useRouter()
 const hasToken = computed(() => user.isLoggedIn)
 
 const messages = ref([])
 const draft = ref('')
 const sending = ref(false)
 const scrollRef = ref(null)
+const currentSessionId = ref(null)
+const loadingHistory = ref(false)
+
+onMounted(() => {
+  const sid = route.query.sessionId
+  if (sid) {
+    currentSessionId.value = Number(sid)
+    loadHistory(Number(sid))
+  }
+})
+
+watch(() => route.query.sessionId, (newId) => {
+  if (newId) {
+    currentSessionId.value = Number(newId)
+    loadHistory(Number(newId))
+  } else {
+    currentSessionId.value = null
+    messages.value = []
+  }
+})
+
+async function loadHistory(sessionId) {
+  loadingHistory.value = true
+  try {
+    const res = await getSessionMessages(sessionId, { pageNum: 1, pageSize: 100 })
+    const records = res.data.data?.records || []
+    // 消息是倒序的，需要反转
+    messages.value = records.map(m => ({ role: m.role, content: m.content, streaming: false }))
+    scrollBottom()
+  } catch (e) {
+    ElMessage.error('加载历史消息失败')
+  } finally {
+    loadingHistory.value = false
+  }
+}
 
 function clearSession() {
   messages.value = []
+  currentSessionId.value = null
+  router.replace('/home')
 }
 
 function scrollBottom() {
@@ -95,10 +140,15 @@ async function send() {
 
   try {
     await streamChat({
+      sessionId: currentSessionId.value,
       content: text,
       onMeta: (meta) => {
         if (meta?.riskLevel === 'HIGH') {
           ElMessage.warning('检测到高风险表述，已启用安全回复并记录预警')
+        }
+        if (meta?.sessionId && !currentSessionId.value) {
+          currentSessionId.value = meta.sessionId
+          router.replace({ query: { sessionId: meta.sessionId } })
         }
       },
       onDelta: (chunk) => {
@@ -186,13 +236,15 @@ async function send() {
 .msg-scroll {
   flex: 1;
   overflow: hidden;
+  min-height: 0;
 }
 .msg-scroll :deep(.el-scrollbar__wrap) {
   overflow-x: hidden;
+  overflow-y: auto;
   padding-bottom: 16px;
 }
 .msg-scroll :deep(.el-scrollbar__view) {
-  height: 100%;
+  height: auto;
 }
 .msgs {
   max-width: 720px;

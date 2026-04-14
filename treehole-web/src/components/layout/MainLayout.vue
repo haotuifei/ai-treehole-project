@@ -46,7 +46,7 @@
               </el-menu-item>
               <el-menu-item index="/student/emotion">
                 <el-icon><Collection /></el-icon>
-                <template #title>情绪档案</template>
+                <template #title>Psychological SO</template>
               </el-menu-item>
               <el-menu-item index="/student/history">
                 <el-icon><Clock /></el-icon>
