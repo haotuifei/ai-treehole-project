@@ -24,6 +24,9 @@ public class AiChatProperties {
 
     private String model = "deepseek-chat";
 
+    /** API 端点路径，默认 /v1/chat/completions，Anthropic 兼容填 /v1/messages */
+    private String apiEndpoint = "/v1/chat/completions";
+
     private int connectTimeoutMs = 30_000;
 
     private int readTimeoutMs = 300_000;

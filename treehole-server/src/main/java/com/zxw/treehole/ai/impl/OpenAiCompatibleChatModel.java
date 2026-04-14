@@ -39,7 +39,10 @@ public class OpenAiCompatibleChatModel implements ChatLanguageModel {
             throw new IllegalStateException("未配置 app.ai.api-key，无法调用大模型");
         }
         String base = props.getApiBase().replaceAll("/+$", "");
-        String url = base + "/v1/chat/completions";
+        String endpoint = props.getApiEndpoint();
+        String url = base + endpoint;
+
+        boolean isAnthropic = base.contains("anthropic");
 
         ObjectNode root = objectMapper.createObjectNode();
         root.put("model", props.getModel());
@@ -56,15 +59,16 @@ public class OpenAiCompatibleChatModel implements ChatLanguageModel {
         HttpClient client = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofMillis(props.getConnectTimeoutMs()))
                 .build();
-        HttpRequest req = HttpRequest.newBuilder()
+        HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .timeout(Duration.ofMillis(props.getReadTimeoutMs()))
                 .header("Authorization", "Bearer " + props.getApiKey())
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
-                .build();
-
-        HttpResponse<java.io.InputStream> resp = client.send(req, HttpResponse.BodyHandlers.ofInputStream());
+                .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
+        if (isAnthropic) {
+            reqBuilder.header("anthropic-version", "2023-06-01");
+        }
+        HttpResponse<java.io.InputStream> resp = client.send(reqBuilder.build(), HttpResponse.BodyHandlers.ofInputStream());
         if (resp.statusCode() < 200 || resp.statusCode() >= 300) {
             String err = new String(resp.body().readAllBytes(), StandardCharsets.UTF_8);
             log.warn("LLM HTTP {} : {}", resp.statusCode(), err);
@@ -72,30 +76,64 @@ public class OpenAiCompatibleChatModel implements ChatLanguageModel {
         }
 
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(resp.body(), StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                if (line.isBlank()) {
-                    continue;
-                }
-                if (!line.startsWith("data:")) {
-                    continue;
-                }
-                String payload = line.substring(5).trim();
-                if ("[DONE]".equals(payload)) {
-                    break;
-                }
-                JsonNode node = objectMapper.readTree(payload);
-                JsonNode choices = node.path("choices");
-                if (!choices.isArray() || choices.isEmpty()) {
-                    continue;
-                }
-                JsonNode delta = choices.get(0).path("delta");
-                if (delta.has("content") && !delta.get("content").isNull()) {
-                    String piece = delta.get("content").asText("");
-                    if (!piece.isEmpty()) {
-                        onChunk.accept(piece);
+            if (isAnthropic) {
+                parseAnthropicStream(reader, onChunk);
+            } else {
+                parseOpenAiStream(reader, onChunk);
+            }
+        }
+    }
+
+    private void parseOpenAiStream(BufferedReader reader, LlmChunkConsumer onChunk) throws Exception {
+        String line;
+        while ((line = reader.readLine()) != null) {
+            if (line.isBlank()) continue;
+            if (!line.startsWith("data:")) continue;
+            String payload = line.substring(5).trim();
+            if ("[DONE]".equals(payload)) break;
+            JsonNode node = objectMapper.readTree(payload);
+            JsonNode choices = node.path("choices");
+            if (!choices.isArray() || choices.isEmpty()) continue;
+            JsonNode delta = choices.get(0).path("delta");
+            if (delta.has("content") && !delta.get("content").isNull()) {
+                String piece = delta.get("content").asText("");
+                if (!piece.isEmpty()) onChunk.accept(piece);
+            }
+        }
+    }
+
+    private void parseAnthropicStream(BufferedReader reader, LlmChunkConsumer onChunk) throws Exception {
+        String eventName = "";
+        StringBuilder dataBuf = new StringBuilder();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            if (line.isBlank()) {
+                if (dataBuf.length() > 0) {
+                    String data = dataBuf.toString();
+                    if ("[DONE]".equals(data)) break;
+                    if ("event".equals(eventName)) {
+                        // event: 行的数据部分
+                    } else if (dataBuf.length() > 0) {
+                        try {
+                            JsonNode node = objectMapper.readTree(data);
+                            if ("content_block_delta".equals(node.path("type").asText())) {
+                                JsonNode delta = node.path("delta");
+                                if (delta.has("text")) {
+                                    String text = delta.get("text").asText();
+                                    if (!text.isEmpty()) onChunk.accept(text);
+                                }
+                            }
+                        } catch (Exception ignored) {}
                     }
+                    dataBuf.setLength(0);
                 }
+                eventName = "";
+                continue;
+            }
+            if (line.startsWith("event:")) {
+                eventName = line.substring(6).trim();
+            } else if (line.startsWith("data:")) {
+                dataBuf.append(line.substring(5).trim());
             }
         }
     }

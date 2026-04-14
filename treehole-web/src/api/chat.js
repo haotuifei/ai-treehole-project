@@ -1,5 +1,6 @@
 import { getToken } from './http'
 import { readSseStream } from '../utils/sseStream'
+import { http } from './http'
 
 /**
  * 流式发送树洞消息（POST + SSE）
@@ -47,5 +48,28 @@ export async function streamChat({ sessionId, content, onMeta, onDelta, onBlocke
       }
     },
     error: (data) => onError?.(data)
+  })
+}
+
+/**
+ * 获取会话列表
+ */
+export function listSessions() {
+  return http.get('/student/chat/sessions')
+}
+
+/**
+ * 删除会话
+ */
+export function deleteSession(sessionId) {
+  return http.delete(`/student/chat/sessions/${sessionId}`)
+}
+
+/**
+ * 分页获取会话消息
+ */
+export function getSessionMessages(sessionId, { pageNum = 1, pageSize = 30 } = {}) {
+  return http.get(`/student/chat/sessions/${sessionId}/messages`, {
+    params: { pageNum, pageSize }
   })
 }
