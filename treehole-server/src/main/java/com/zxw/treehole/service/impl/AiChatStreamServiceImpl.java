@@ -101,6 +101,9 @@ public class AiChatStreamServiceImpl implements AiChatStreamService {
         if (!StringUtils.hasText(systemPrompt)) {
             systemPrompt = "你是温和、有共情的树洞陪伴者，不做医疗诊断。";
         }
+        if (StringUtils.hasText(request.getCustomSystemPrompt())) {
+            systemPrompt = systemPrompt + "\n\n【当前用户的个性化偏好】\n" + request.getCustomSystemPrompt().trim();
+        }
 
         List<LlmMessage> messages = buildLlmMessages(session.getId(), systemPrompt);
         StringBuilder full = new StringBuilder();

@@ -2,8 +2,8 @@
   <div class="page">
     <div class="top-bar">
       <div class="title-group">
-        <h2 class="chat-title">AI 树洞</h2>
-        <p class="chat-sub">慢慢说，我会认真听。</p>
+        <h2 class="chat-title">{{ preferences.aiName }}</h2>
+        <p class="chat-sub">{{ preferences.subtitle }}</p>
       </div>
       <div class="top-actions">
         <el-button v-if="!user.isLoggedIn" type="primary" round plain @click="$router.push('/login')">
@@ -22,8 +22,8 @@
           <template v-else>
             <div v-for="(m, i) in messages" :key="i" :class="['bubble', m.role]">
               <div class="bubble-content">
-                <span class="role-tag">{{ m.role === 'user' ? '我' : '陪伴者' }}</span>
-                <p class="text">{{ m.content }}<span v-if="m.streaming" class="cursor">▍</span></p>
+                <span class="role-tag">{{ m.role === 'user' ? '我' : preferences.aiName }}</span>
+                <p class="text">{{ displayMessageContent(m) }}<span v-if="m.streaming" class="cursor">▍</span></p>
               </div>
             </div>
             <div v-if="!messages.length && !sending" class="empty-state">
@@ -43,7 +43,7 @@
             v-model="draft"
             type="textarea"
             :rows="3"
-            placeholder="说说备考压力、情绪或任何想聊的…"
+            :placeholder="composerPlaceholder"
             :disabled="sending || !user.isLoggedIn"
             @keydown.enter.exact.prevent="send"
           />
@@ -69,11 +69,17 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { streamChat, getSessionMessages } from '../../api/chat'
 import { useUserStore } from '../../stores/user'
+import { useAiPreferencesStore } from '../../stores/aiPreferences'
 
 const user = useUserStore()
+const preferences = useAiPreferencesStore()
 const route = useRoute()
 const router = useRouter()
 const hasToken = computed(() => user.isLoggedIn)
+const composerPlaceholder = computed(() => {
+  const name = preferences.userNickname || '你'
+  return `和${preferences.aiName}聊聊吧，${name}现在最想说些什么？`
+})
 
 const messages = ref([])
 const draft = ref('')
@@ -92,8 +98,14 @@ onMounted(() => {
 
 watch(() => route.query.sessionId, (newId) => {
   if (newId) {
-    currentSessionId.value = Number(newId)
-    loadHistory(Number(newId))
+    const nextSessionId = Number(newId)
+    // 首次流式创建会话时，onMeta 会先写入 currentSessionId 再更新路由；
+    // 这时如果立刻拉历史，会把本地正在流式输出的消息覆盖掉。
+    if (nextSessionId === currentSessionId.value && messages.value.length) {
+      return
+    }
+    currentSessionId.value = nextSessionId
+    loadHistory(nextSessionId)
   } else {
     currentSessionId.value = null
     messages.value = []
@@ -105,7 +117,7 @@ async function loadHistory(sessionId) {
   try {
     const res = await getSessionMessages(sessionId, { pageNum: 1, pageSize: 100 })
     const records = res.data.data?.records || []
-    // 消息是倒序的，需要反转
+    // 接口已经按时间正序返回，直接展示即可
     messages.value = records.map(m => ({ role: m.role, content: m.content, streaming: false }))
     scrollBottom()
   } catch (e) {
@@ -128,6 +140,16 @@ function scrollBottom() {
   })
 }
 
+function displayMessageContent(message) {
+  const raw = message?.content || ''
+  if (message?.role !== 'assistant') return raw
+
+  return raw
+    .replace(/\r\n/g, '\n')
+    .replace(/^\s*\n+/, '')
+    .replace(/\n{3,}/g, '\n\n')
+}
+
 async function send() {
   const text = draft.value.trim()
   if (!text || sending.value) return
@@ -142,6 +164,7 @@ async function send() {
     await streamChat({
       sessionId: currentSessionId.value,
       content: text,
+      customSystemPrompt: preferences.buildCustomSystemPrompt(),
       onMeta: (meta) => {
         if (meta?.riskLevel === 'HIGH') {
           ElMessage.warning('检测到高风险表述，已启用安全回复并记录预警')

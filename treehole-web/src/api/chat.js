@@ -5,7 +5,7 @@ import { http } from './http'
 /**
  * 流式发送树洞消息（POST + SSE）
  */
-export async function streamChat({ sessionId, content, onMeta, onDelta, onBlocked, onEnd, onError }) {
+export async function streamChat({ sessionId, content, customSystemPrompt, onMeta, onDelta, onBlocked, onEnd, onError }) {
   const token = getToken()
   const res = await fetch('/api/student/chat/stream', {
     method: 'POST',
@@ -15,7 +15,8 @@ export async function streamChat({ sessionId, content, onMeta, onDelta, onBlocke
     },
     body: JSON.stringify({
       sessionId: sessionId ?? null,
-      content
+      content,
+      customSystemPrompt: customSystemPrompt || ''
     })
   })
 

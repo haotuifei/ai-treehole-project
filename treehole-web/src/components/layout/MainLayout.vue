@@ -99,6 +99,23 @@
             </template>
           </el-menu>
         </el-scrollbar>
+        <div class="aside-bottom">
+          <el-menu
+            :default-active="activeMenu"
+            :collapse="false"
+            router
+            class="th-menu bottom-menu"
+            background-color="transparent"
+            text-color="var(--th-text)"
+            active-text-color="var(--th-primary)"
+            @select="handleMenuSelect"
+          >
+            <el-menu-item index="/settings">
+              <el-icon><Setting /></el-icon>
+              <template #title>设置</template>
+            </el-menu-item>
+          </el-menu>
+        </div>
       </div>
     </el-aside>
 
@@ -110,7 +127,6 @@
         <span class="header-title">{{ headerTitle }}</span>
         <div class="header-right">
           <span class="who">{{ displayName }}</span>
-          <el-button type="primary" plain round size="small" @click="onLogout">退出</el-button>
         </div>
       </el-header>
       <el-main class="main">
@@ -170,16 +186,13 @@ function handleMenuSelect() {
   }
 }
 
-function onLogout() {
-  user.logout()
-  router.push('/login')
-}
 </script>
 
 <style scoped>
 .layout-root {
-  min-height: 100vh;
+  height: 100vh;
   background: var(--th-bg);
+  overflow: hidden;
 }
 
 .sidebar-overlay {
@@ -204,6 +217,7 @@ function onLogout() {
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
   flex-shrink: 0;
+  height: 100vh;
 }
 
 .aside-mobile {
@@ -277,6 +291,10 @@ function onLogout() {
   padding-bottom: 24px;
 }
 
+.bottom-menu {
+  padding: 8px 0 16px;
+}
+
 .th-menu:not(.el-menu--collapse) {
   width: 220px;
 }
@@ -300,6 +318,15 @@ function onLogout() {
   min-width: 0;
   flex: 1;
   width: 100%;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.aside-bottom {
+  border-top: 1px solid var(--th-border);
+  padding-top: 8px;
+  flex-shrink: 0;
+  background: var(--th-surface);
 }
 
 .header {
@@ -338,8 +365,9 @@ function onLogout() {
 .main {
   padding: 0;
   background: var(--th-bg);
-  min-height: calc(100vh - 56px);
+  height: calc(100vh - 56px);
   overflow-x: hidden;
+  overflow-y: auto;
 }
 
 @media (max-width: 768px) {

@@ -28,6 +28,12 @@ const routes = [
         component: () => import('../views/common/Profile.vue')
       },
       {
+        path: 'settings',
+        name: 'Settings',
+        meta: { title: '设置' },
+        component: () => import('../views/common/Settings.vue')
+      },
+      {
         path: 'student/goals',
         name: 'StudentGoals',
         meta: { title: '目标管理', roles: ['STUDENT'] },

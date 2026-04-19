@@ -15,4 +15,8 @@ public class ChatStreamRequest {
     @NotBlank(message = "消息内容不能为空")
     @Size(max = 8000, message = "单条消息不超过 8000 字")
     private String content;
+
+    @Schema(description = "个性化系统提示词")
+    @Size(max = 4000, message = "个性化设置过长")
+    private String customSystemPrompt;
 }
