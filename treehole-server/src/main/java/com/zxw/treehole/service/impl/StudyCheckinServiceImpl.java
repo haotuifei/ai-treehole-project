@@ -12,11 +12,22 @@ import com.zxw.treehole.entity.StudyGoal;
 import com.zxw.treehole.exception.BusinessException;
 import com.zxw.treehole.mapper.StudyCheckinMapper;
 import com.zxw.treehole.mapper.StudyGoalMapper;
+import com.zxw.treehole.mapper.dto.CalendarDayRow;
 import com.zxw.treehole.service.StudyCheckinService;
+import com.zxw.treehole.vo.CheckinCalendarVo;
+import com.zxw.treehole.vo.CheckinStreakVo;
 import com.zxw.treehole.vo.StudyCheckinVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -156,5 +167,95 @@ public class StudyCheckinServiceImpl implements StudyCheckinService {
         v.setCreateTime(c.getCreateTime());
         v.setUpdateTime(c.getUpdateTime());
         return v;
+    }
+
+    @Override
+    public CheckinStreakVo getStreakStats(Long userId) {
+        CheckinStreakVo vo = new CheckinStreakVo();
+        List<LocalDate> allDates = studyCheckinMapper.listAllCheckDates(userId);
+        if (allDates.isEmpty()) {
+            return vo;
+        }
+
+        LocalDate today = LocalDate.now();
+        boolean checkedToday = allDates.contains(today);
+        vo.setCheckedToday(checkedToday);
+
+        // 计算当前连续天数：从今天（或昨天，如果今天没打卡）往前数
+        LocalDate cursor = checkedToday ? today : today.minusDays(1);
+        int currentStreak = 0;
+        for (LocalDate d : allDates) {
+            if (d.equals(cursor)) {
+                currentStreak++;
+                cursor = cursor.minusDays(1);
+            } else if (d.isBefore(cursor)) {
+                break;
+            }
+        }
+        vo.setCurrentStreak(currentStreak);
+
+        // 计算历史最长连续天数
+        int longest = 0;
+        int streak = 1;
+        for (int i = 1; i < allDates.size(); i++) {
+            if (allDates.get(i - 1).minusDays(1).equals(allDates.get(i))) {
+                streak++;
+            } else {
+                longest = Math.max(longest, streak);
+                streak = 1;
+            }
+        }
+        longest = Math.max(longest, streak);
+        vo.setLongestStreak(longest);
+
+        // 本月打卡天数
+        String yearMonth = today.format(DateTimeFormatter.ofPattern("yyyy-MM"));
+        Long monthDays = studyCheckinMapper.countDistinctCheckDatesForMonth(userId, yearMonth, null);
+        vo.setMonthDays(monthDays != null ? monthDays.intValue() : 0);
+
+        return vo;
+    }
+
+    @Override
+    public CheckinCalendarVo getMonthCalendar(Long userId, String yearMonth) {
+        CheckinCalendarVo vo = new CheckinCalendarVo();
+
+        // 月历打卡数据
+        List<CalendarDayRow> rows = studyCheckinMapper.listMonthCalendar(userId, yearMonth);
+        Map<String, CheckinCalendarVo.DayInfo> days = new LinkedHashMap<>();
+        for (CalendarDayRow row : rows) {
+            String key = row.getCheckDate().toString();
+            days.put(key, new CheckinCalendarVo.DayInfo(
+                    true,
+                    row.getTotalMinutes() != null ? row.getTotalMinutes().intValue() : 0,
+                    row.getMood(),
+                    row.getCheckinId()
+            ));
+        }
+        vo.setDays(days);
+
+        // 进行中的目标列表
+        List<StudyGoal> goals = studyGoalMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<StudyGoal>()
+                        .eq(StudyGoal::getUserId, userId)
+                        .eq(StudyGoal::getStatus, 0)
+                        .eq(StudyGoal::getDeleted, 0));
+        List<CheckinCalendarVo.GoalInfo> goalInfos = new ArrayList<>();
+        for (StudyGoal g : goals) {
+            CheckinCalendarVo.GoalInfo gi = new CheckinCalendarVo.GoalInfo();
+            gi.setGoalId(g.getId());
+            gi.setGoalName(g.getGoalName());
+            gi.setGoalType(g.getGoalType());
+            gi.setStartDate(g.getStartDate());
+            gi.setEndDate(g.getEndDate());
+            Long totalCheckins = studyCheckinMapper.countCheckinDaysByGoal(g.getId(), userId);
+            gi.setTotalCheckins(totalCheckins != null ? totalCheckins : 0);
+            Long totalMinutes = studyCheckinMapper.sumDurationMinutesByGoalAndUser(g.getId(), userId);
+            gi.setTotalMinutes(totalMinutes != null ? totalMinutes : 0);
+            goalInfos.add(gi);
+        }
+        vo.setGoals(goalInfos);
+
+        return vo;
     }
 }

@@ -101,6 +101,22 @@ CREATE TABLE study_checkin (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学习打卡表';
 
 -- ----------------------------
+-- 辅导员-班级关联
+-- ----------------------------
+DROP TABLE IF EXISTS counselor_class;
+
+CREATE TABLE counselor_class (
+    id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键',
+    counselor_user_id   BIGINT          NOT NULL COMMENT '辅导员用户ID',
+    class_name          VARCHAR(64)     NOT NULL COMMENT '班级名称',
+    deleted             TINYINT         NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+    create_time         DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time         DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_counselor_class (counselor_user_id, class_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='辅导员-班级关联表';
+
+-- ----------------------------
 -- AI 对话
 -- ----------------------------
 DROP TABLE IF EXISTS ai_chat_message;

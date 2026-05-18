@@ -25,11 +25,11 @@
             active-text-color="var(--th-primary)"
             @select="handleMenuSelect"
           >
-            <el-menu-item index="/home">
+            <el-menu-item v-if="user.isStudent()" index="/home">
               <el-icon><House /></el-icon>
               <template #title>首页</template>
             </el-menu-item>
-            <el-menu-item index="/profile">
+            <el-menu-item v-if="!user.isAdmin()" index="/profile">
               <el-icon><User /></el-icon>
               <template #title>个人中心</template>
             </el-menu-item>
@@ -174,7 +174,13 @@ const headerTitle = computed(() => {
 })
 
 function handleBrandClick() {
-  router.push('/home')
+  if (user.isAdmin()) {
+    router.push('/admin/users')
+  } else if (user.isCounselor()) {
+    router.push('/counselor/students')
+  } else {
+    router.push('/home')
+  }
   if (isMobile.value) {
     app.closeSidebar()
   }

@@ -32,6 +32,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Service
@@ -39,6 +41,33 @@ import java.util.concurrent.Executor;
 public class AiChatStreamServiceImpl implements AiChatStreamService {
 
     private static final String RISK_HIGH = "HIGH";
+    private static final Pattern GOAL_SUGGEST_PATTERN = Pattern.compile("\\[GOAL_SUGGEST:(.+?):(.+?)\\]");
+
+    /** 用户消息中的目标关键词 → (目标名称, 目标类型) */
+    private static final List<Map.Entry<String, String[]>> GOAL_KEYWORDS = List.of(
+            Map.entry("考研", new String[]{"考研备考", "POSTGRAD"}),
+            Map.entry("研究生", new String[]{"考研备考", "POSTGRAD"}),
+            Map.entry("考公", new String[]{"考公备考", "CIVIL_SERVICE"}),
+            Map.entry("公务员", new String[]{"考公备考", "CIVIL_SERVICE"}),
+            Map.entry("国考", new String[]{"国考备考", "CIVIL_SERVICE"}),
+            Map.entry("省考", new String[]{"省考备考", "CIVIL_SERVICE"}),
+            Map.entry("考编", new String[]{"考编备考", "CIVIL_SERVICE"}),
+            Map.entry("四六级", new String[]{"英语四六级", "COURSE"}),
+            Map.entry("四级", new String[]{"英语四级", "COURSE"}),
+            Map.entry("六级", new String[]{"英语六级", "COURSE"}),
+            Map.entry("雅思", new String[]{"雅思备考", "COURSE"}),
+            Map.entry("托福", new String[]{"托福备考", "COURSE"}),
+            Map.entry("驾照", new String[]{"考驾照", "CUSTOM"}),
+            Map.entry("学车", new String[]{"考驾照", "CUSTOM"}),
+            Map.entry("教资", new String[]{"教师资格证", "COURSE"}),
+            Map.entry("教师资格证", new String[]{"教师资格证", "COURSE"}),
+            Map.entry("计算机二级", new String[]{"计算机二级", "COURSE"}),
+            Map.entry("注会", new String[]{"注册会计师", "COURSE"}),
+            Map.entry("法考", new String[]{"法律职业资格考试", "COURSE"}),
+            Map.entry("考研政治", new String[]{"考研政治", "POSTGRAD"}),
+            Map.entry("考研英语", new String[]{"考研英语", "POSTGRAD"}),
+            Map.entry("考研数学", new String[]{"考研数学", "POSTGRAD"})
+    );
 
     private final AiChatSessionMapper sessionMapper;
     private final AiChatMessageMapper messageMapper;
@@ -119,8 +148,38 @@ public class AiChatStreamServiceImpl implements AiChatStreamService {
         if (!StringUtils.hasText(reply)) {
             reply = "我在呢，刚才没有组织好语言，可以再说一点点你现在的心情吗？";
         }
+
+        // 解析目标建议：先尝试 LLM 标记，再用关键词检测
+        String goalName = null;
+        String goalType = null;
+        Matcher goalMatcher = GOAL_SUGGEST_PATTERN.matcher(reply);
+        if (goalMatcher.find()) {
+            goalName = goalMatcher.group(1).trim();
+            goalType = goalMatcher.group(2).trim();
+            reply = goalMatcher.replaceAll("").trim();
+            log.debug("从 AI 回复中检测到目标标记: name={}, type={}", goalName, goalType);
+        } else {
+            // LLM 未输出标记时，用关键词检测用户消息
+            String[] detected = detectGoalFromContent(content);
+            if (detected != null) {
+                goalName = detected[0];
+                goalType = detected[1];
+                log.debug("从用户消息中检测到目标关键词: name={}, type={}", goalName, goalType);
+            }
+        }
+
         Long assistantId = saveAssistantMessage(session.getId(), reply);
         touchSession(session, content);
+
+        // 发送目标建议事件
+        if (goalName != null) {
+            Map<String, String> goalSuggest = new LinkedHashMap<>();
+            goalSuggest.put("goalName", goalName);
+            goalSuggest.put("goalType", goalType);
+            emitter.send(SseEmitter.event().name("goal_suggest")
+                    .data(goalSuggest, MediaType.APPLICATION_JSON));
+        }
+
         sendEnd(emitter, assistantId);
     }
 
@@ -205,5 +264,21 @@ public class AiChatStreamServiceImpl implements AiChatStreamService {
         Map<String, Object> end = new LinkedHashMap<>();
         end.put("assistantMessageId", assistantMessageId);
         emitter.send(SseEmitter.event().name("end").data(end, MediaType.APPLICATION_JSON));
+    }
+
+    /**
+     * 从用户消息中检测目标关键词，返回 [目标名称, 目标类型]，未检测到返回 null
+     */
+    private String[] detectGoalFromContent(String content) {
+        if (!StringUtils.hasText(content)) {
+            return null;
+        }
+        String lower = content.toLowerCase();
+        for (Map.Entry<String, String[]> entry : GOAL_KEYWORDS) {
+            if (lower.contains(entry.getKey())) {
+                return entry.getValue();
+            }
+        }
+        return null;
     }
 }

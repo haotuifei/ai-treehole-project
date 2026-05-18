@@ -5,7 +5,7 @@ import { http } from './http'
 /**
  * 流式发送树洞消息（POST + SSE）
  */
-export async function streamChat({ sessionId, content, customSystemPrompt, onMeta, onDelta, onBlocked, onEnd, onError }) {
+export async function streamChat({ sessionId, content, customSystemPrompt, onMeta, onDelta, onBlocked, onGoalSuggest, onEnd, onError }) {
   const token = getToken()
   const res = await fetch('/api/student/chat/stream', {
     method: 'POST',
@@ -21,8 +21,15 @@ export async function streamChat({ sessionId, content, customSystemPrompt, onMet
   })
 
   if (!res.ok) {
-    const text = await res.text()
-    throw new Error(text || `HTTP ${res.status}`)
+    let errorMsg = `HTTP ${res.status}`
+    try {
+      const text = await res.text()
+      const json = JSON.parse(text)
+      errorMsg = json.message || errorMsg
+    } catch {
+      // ignore parse error
+    }
+    throw new Error(errorMsg)
   }
 
   await readSseStream(res, {
@@ -39,6 +46,13 @@ export async function streamChat({ sessionId, content, customSystemPrompt, onMet
         onBlocked?.(JSON.parse(data))
       } catch {
         onBlocked?.(null)
+      }
+    },
+    goal_suggest: (data) => {
+      try {
+        onGoalSuggest?.(JSON.parse(data))
+      } catch {
+        onGoalSuggest?.(null)
       }
     },
     end: (data) => {

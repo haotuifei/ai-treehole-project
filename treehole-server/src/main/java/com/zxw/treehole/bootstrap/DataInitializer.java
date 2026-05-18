@@ -124,10 +124,20 @@ public class DataInitializer implements ApplicationRunner {
         SysUser co = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUser>()
                 .eq(SysUser::getUsername, "counselor")
                 .eq(SysUser::getDeleted, 0));
-        if (st != null && co != null && st.getCounselorId() == null) {
-            st.setCounselorId(co.getId());
-            sysUserMapper.updateById(st);
-            log.info("已将演示学生 student 关联到辅导员 counselor，便于预警联调");
+        if (st != null && co != null) {
+            // 给演示学生设置班级
+            if (st.getClassName() == null || st.getClassName().isBlank()) {
+                st.setClassName("演示班级");
+                st.setCounselorId(co.getId());
+                sysUserMapper.updateById(st);
+                log.info("已将演示学生 student 的班级设为「演示班级」");
+            }
+            // 给辅导员设置班级（与学生一致）
+            if (co.getClassName() == null || co.getClassName().isBlank()) {
+                co.setClassName("演示班级");
+                sysUserMapper.updateById(co);
+                log.info("已将辅导员 counselor 的班级设为「演示班级」");
+            }
         }
     }
 

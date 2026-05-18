@@ -7,6 +7,8 @@ import com.zxw.treehole.dto.CheckinPageQuery;
 import com.zxw.treehole.dto.CheckinUpdateRequest;
 import com.zxw.treehole.security.LoginUser;
 import com.zxw.treehole.service.StudyCheckinService;
+import com.zxw.treehole.vo.CheckinCalendarVo;
+import com.zxw.treehole.vo.CheckinStreakVo;
 import com.zxw.treehole.vo.StudyCheckinVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -24,6 +26,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import static com.zxw.treehole.config.OpenApiConfig.SECURITY_SCHEME_NAME;
@@ -80,5 +83,20 @@ public class StudyCheckinController {
             @PathVariable Long id) {
         studyCheckinService.deleteCheckin(loginUser.getUser().getId(), id);
         return Result.ok(null);
+    }
+
+    @Operation(summary = "连续打卡统计")
+    @GetMapping("/streak")
+    public Result<CheckinStreakVo> streak(
+            @AuthenticationPrincipal LoginUser loginUser) {
+        return Result.ok(studyCheckinService.getStreakStats(loginUser.getUser().getId()));
+    }
+
+    @Operation(summary = "月历打卡数据")
+    @GetMapping("/calendar")
+    public Result<CheckinCalendarVo> calendar(
+            @AuthenticationPrincipal LoginUser loginUser,
+            @RequestParam String yearMonth) {
+        return Result.ok(studyCheckinService.getMonthCalendar(loginUser.getUser().getId(), yearMonth));
     }
 }

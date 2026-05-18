@@ -147,7 +147,15 @@ async function onSubmit() {
   try {
     await user.login({ username: form.username, password: form.password })
     const redir = route.query.redirect
-    redirectPath.value = typeof redir === 'string' && redir.startsWith('/') ? redir : '/home'
+    if (typeof redir === 'string' && redir.startsWith('/')) {
+      redirectPath.value = redir
+    } else if (user.isAdmin()) {
+      redirectPath.value = '/admin/users'
+    } else if (user.isCounselor()) {
+      redirectPath.value = '/counselor/students'
+    } else {
+      redirectPath.value = '/home'
+    }
     showWelcome.value = true
   } catch (e) {
     const msg = e?.response?.data?.message || e?.message || '登录失败'

@@ -44,11 +44,25 @@ public class CounselorWarningServiceImpl implements CounselorWarningService {
     private final InterventionRecordMapper interventionRecordMapper;
     private final SysUserMapper sysUserMapper;
 
+    private String getCounselorClassName(Long counselorUserId) {
+        SysUser counselor = sysUserMapper.selectById(counselorUserId);
+        return counselor != null ? counselor.getClassName() : null;
+    }
+
     @Override
     public PageResult<WarningListItemVo> pageWarnings(Long counselorUserId, CounselorWarningPageQuery query) {
+        String className = getCounselorClassName(counselorUserId);
+        if (className == null || className.isBlank()) {
+            Page<WarningListItemVo> empty = new Page<>(query.getPageNum(), query.getPageSize(), 0);
+            empty.setRecords(List.of());
+            return PageResult.of(empty);
+        }
+
         LambdaQueryWrapper<SysUser> uw = new LambdaQueryWrapper<SysUser>()
-                .eq(SysUser::getCounselorId, counselorUserId)
-                .eq(SysUser::getDeleted, 0);
+                .eq(SysUser::getClassName, className)
+                .eq(SysUser::getDeleted, 0)
+                .inSql(SysUser::getId,
+                        "SELECT user_id FROM sys_user_role WHERE role_id = (SELECT id FROM sys_role WHERE role_code = 'STUDENT')");
         if (StringUtils.hasText(query.getStudentKeyword())) {
             String kw = query.getStudentKeyword().trim();
             uw.and(w -> w.like(SysUser::getRealName, kw).or().like(SysUser::getUsername, kw));
@@ -176,7 +190,8 @@ public class CounselorWarningServiceImpl implements CounselorWarningService {
         if (st == null || (st.getDeleted() != null && st.getDeleted() == 1)) {
             throw new BusinessException("学生不存在");
         }
-        if (!counselorUserId.equals(st.getCounselorId())) {
+        String className = getCounselorClassName(counselorUserId);
+        if (st.getClassName() == null || !st.getClassName().equals(className)) {
             throw new BusinessException(ResultCode.FORBIDDEN.getCode(), "无权查看该学生预警");
         }
     }

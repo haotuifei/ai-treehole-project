@@ -1,33 +1,47 @@
 package com.zxw.treehole.ai.config;
 
 import com.zxw.treehole.ai.client.ChatLanguageModel;
-import com.zxw.treehole.ai.impl.MockChatLanguageModel;
+import com.zxw.treehole.ai.client.LlmMessage;
 import com.zxw.treehole.ai.impl.OpenAiCompatibleChatModel;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import com.zxw.treehole.config.AiChatProperties;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
+import java.util.List;
+
 /**
- * 按 app.ai.provider 注入统一的 {@link ChatLanguageModel}
+ * 根据数据库配置动态注入 ChatLanguageModel
  */
+@Slf4j
 @Configuration
 public class AiModelConfiguration {
 
     @Bean
     @Primary
-    @ConditionalOnProperty(name = "app.ai.provider", havingValue = "openai-compatible")
     public ChatLanguageModel chatLanguageModel(
-            @Qualifier("openAiCompatibleChatModelBean") OpenAiCompatibleChatModel impl) {
-        return impl;
+            OpenAiCompatibleChatModel openAiModel,
+            AiChatProperties aiChatProperties) {
+        // 返回代理，每次调用时动态检查配置
+        return new DynamicChatLanguageModel(openAiModel, aiChatProperties);
     }
 
-    @Bean
-    @Primary
-    @ConditionalOnProperty(name = "app.ai.provider", havingValue = "mock", matchIfMissing = true)
-    public ChatLanguageModel chatLanguageModelMock(
-            @Qualifier("mockChatLanguageModelBean") MockChatLanguageModel impl) {
-        return impl;
+    /**
+     * 动态代理：每次调用时检查数据库配置
+     */
+    @RequiredArgsConstructor
+    private static class DynamicChatLanguageModel implements ChatLanguageModel {
+        private final OpenAiCompatibleChatModel delegate;
+        private final AiChatProperties aiChatProperties;
+
+        @Override
+        public void streamChat(List<LlmMessage> messages, LlmChunkConsumer onChunk) throws Exception {
+            if (!aiChatProperties.hasActiveConfig()) {
+                throw new IllegalStateException("没有启用的模型配置，请在管理后台配置模型");
+            }
+            delegate.streamChat(messages, onChunk);
+        }
     }
 }

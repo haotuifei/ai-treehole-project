@@ -25,6 +25,16 @@
                 <span class="role-tag">{{ m.role === 'user' ? '我' : preferences.aiName }}</span>
                 <p class="text">{{ displayMessageContent(m) }}<span v-if="m.streaming" class="cursor">▍</span></p>
               </div>
+              <div v-if="m.role === 'assistant' && m.goalSuggest" class="goal-suggest-card">
+                <div class="goal-suggest-text">
+                  <span class="goal-suggest-icon">🎯</span>
+                  <span>将「<strong>{{ m.goalSuggest.goalName }}</strong>」加入目标管理？</span>
+                </div>
+                <div class="goal-suggest-actions">
+                  <el-button size="small" type="primary" :loading="m.goalSuggest._loading" @click="addGoal(m)">加入</el-button>
+                  <el-button size="small" text @click="m.goalSuggest = null">忽略</el-button>
+                </div>
+              </div>
             </div>
             <div v-if="!messages.length && !sending" class="empty-state">
               <p class="empty-text">在下方输入想说的话</p>
@@ -68,6 +78,7 @@ import { ref, computed, nextTick, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { streamChat, getSessionMessages } from '../../api/chat'
+import { createGoal } from '../../api/goal'
 import { useUserStore } from '../../stores/user'
 import { useAiPreferencesStore } from '../../stores/aiPreferences'
 
@@ -133,6 +144,25 @@ function clearSession() {
   router.replace('/home')
 }
 
+async function addGoal(message) {
+  const suggest = message.goalSuggest
+  if (!suggest) return
+  suggest._loading = true
+  try {
+    await createGoal({
+      goalName: suggest.goalName,
+      goalType: suggest.goalType || 'CUSTOM',
+      status: 0
+    })
+    ElMessage.success(`已将「${suggest.goalName}」添加到目标管理`)
+    message.goalSuggest = null
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || '添加失败')
+  } finally {
+    suggest._loading = false
+  }
+}
+
 function scrollBottom() {
   nextTick(() => {
     const wrap = scrollRef.value?.wrapRef
@@ -180,6 +210,12 @@ async function send() {
         scrollBottom()
       },
       onBlocked: () => {},
+      onGoalSuggest: (data) => {
+        if (data?.goalName) {
+          const m = messages.value[assistantIndex]
+          if (m) m.goalSuggest = data
+        }
+      },
       onEnd: () => {
         const m = messages.value[assistantIndex]
         if (m) m.streaming = false
@@ -397,6 +433,33 @@ async function send() {
   margin-top: 12px;
   display: flex;
   justify-content: flex-end;
+}
+.goal-suggest-card {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: rgba(124, 154, 124, 0.08);
+  border: 1px solid rgba(124, 154, 124, 0.25);
+  border-radius: 12px;
+  font-size: 13px;
+  color: var(--th-text);
+  animation: fadeIn 0.3s ease;
+}
+.goal-suggest-text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.goal-suggest-icon {
+  font-size: 16px;
+}
+.goal-suggest-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
 }
 @media (max-width: 768px) {
   .page {

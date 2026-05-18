@@ -35,17 +35,21 @@ public class OpenAiCompatibleChatModel implements ChatLanguageModel {
 
     @Override
     public void streamChat(List<LlmMessage> messages, LlmChunkConsumer onChunk) throws Exception {
-        if (!StringUtils.hasText(props.getApiKey())) {
-            throw new IllegalStateException("未配置 app.ai.api-key，无法调用大模型");
+        String apiKey = props.getEffectiveApiKey();
+        String apiBase = props.getEffectiveApiBase();
+        String model = props.getEffectiveModel();
+
+        if (!StringUtils.hasText(apiKey)) {
+            throw new IllegalStateException("未配置 API Key，无法调用大模型");
         }
-        String base = props.getApiBase().replaceAll("/+$", "");
+        String base = apiBase.replaceAll("/+$", "");
         String endpoint = props.getApiEndpoint();
         String url = base + endpoint;
 
         boolean isAnthropic = base.contains("anthropic");
 
         ObjectNode root = objectMapper.createObjectNode();
-        root.put("model", props.getModel());
+        root.put("model", model);
         root.put("stream", true);
         ArrayNode arr = root.putArray("messages");
         for (LlmMessage m : messages) {
@@ -62,7 +66,7 @@ public class OpenAiCompatibleChatModel implements ChatLanguageModel {
         HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .timeout(Duration.ofMillis(props.getReadTimeoutMs()))
-                .header("Authorization", "Bearer " + props.getApiKey())
+                .header("Authorization", "Bearer " + apiKey)
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
         if (isAnthropic) {

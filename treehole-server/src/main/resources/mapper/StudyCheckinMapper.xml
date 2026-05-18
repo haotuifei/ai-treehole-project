@@ -33,4 +33,42 @@
         GROUP BY check_date
         ORDER BY check_date ASC
     </select>
+
+    <select id="listCheckDatesFrom" resultType="java.time.LocalDate">
+        SELECT DISTINCT check_date
+        FROM study_checkin
+        WHERE user_id = #{userId}
+          AND deleted = 0
+          AND check_date >= #{from}
+        ORDER BY check_date DESC
+    </select>
+
+    <select id="listAllCheckDates" resultType="java.time.LocalDate">
+        SELECT DISTINCT check_date
+        FROM study_checkin
+        WHERE user_id = #{userId}
+          AND deleted = 0
+        ORDER BY check_date DESC
+    </select>
+
+    <select id="listMonthCalendar" resultType="com.zxw.treehole.mapper.dto.CalendarDayRow">
+        SELECT check_date AS checkDate,
+               IFNULL(SUM(duration_minutes), 0) AS totalMinutes,
+               SUBSTRING_INDEX(GROUP_CONCAT(mood ORDER BY id DESC), ',', 1) AS mood,
+               MAX(id) AS checkinId
+        FROM study_checkin
+        WHERE user_id = #{userId}
+          AND deleted = 0
+          AND DATE_FORMAT(check_date, '%Y-%m') = #{yearMonth}
+        GROUP BY check_date
+        ORDER BY check_date ASC
+    </select>
+
+    <select id="countCheckinDaysByGoal" resultType="java.lang.Long">
+        SELECT COUNT(DISTINCT check_date)
+        FROM study_checkin
+        WHERE goal_id = #{goalId}
+          AND user_id = #{userId}
+          AND deleted = 0
+    </select>
 </mapper>

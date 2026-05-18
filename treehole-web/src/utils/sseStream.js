@@ -49,8 +49,8 @@ export async function readSseStream(response, handlers, timeoutMs = 120000) {
         if (typeof fn === 'function') {
           fn(data)
         }
-        // 收到 end 后立刻结束，避免再 await reader.read()（部分环境下连接未及时 EOF 会卡住）
-        if (eventName === 'end') {
+        // 收到 end 或 error 后立刻结束
+        if (eventName === 'end' || eventName === 'error') {
           resolved = true
           break
         }

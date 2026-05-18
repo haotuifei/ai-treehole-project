@@ -129,7 +129,15 @@ router.beforeEach(async (to, from, next) => {
 
   if (to.meta?.public) {
     if (getToken() && to.path === '/login') {
-      next('/home')
+      const userStore = useUserStore()
+      userStore.restoreFromStorage()
+      if (userStore.isAdmin()) {
+        next('/admin/users')
+      } else if (userStore.isCounselor()) {
+        next('/counselor/students')
+      } else {
+        next('/home')
+      }
       return
     }
     next()
@@ -145,6 +153,18 @@ router.beforeEach(async (to, from, next) => {
   userStore.restoreFromStorage()
   if (!userStore.profile) {
     await userStore.fetchProfile()
+  }
+
+  // 管理员访问首页时重定向到管理页面
+  if (to.path === '/home' && userStore.isAdmin()) {
+    next('/admin/users')
+    return
+  }
+
+  // 辅导员访问首页时重定向到学生档案
+  if (to.path === '/home' && userStore.isCounselor()) {
+    next('/counselor/students')
+    return
   }
 
   const need = to.matched.find((r) => r.meta?.roles)?.meta?.roles

@@ -1,59 +1,101 @@
 package com.zxw.treehole.config;
 
+import com.zxw.treehole.entity.ModelConfig;
+import com.zxw.treehole.service.ModelConfigService;
 import lombok.Data;
-import org.springframework.boot.context.properties.ConfigurationProperties;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * AI 树洞：模型接入与人设 Prompt（可被 yaml / 环境变量覆盖）
+ * AI 树洞：模型接入与人设 Prompt
+ * 所有模型配置从数据库读取
  */
+@Slf4j
 @Data
 @Component
-@ConfigurationProperties(prefix = "app.ai")
 public class AiChatProperties {
 
-    /** mock：本地演示；openai-compatible：OpenAI 兼容接口（DeepSeek/通义兼容模式等） */
-    private String provider = "mock";
+    private final ModelConfigService modelConfigService;
 
-    private String apiBase = "https://api.deepseek.com";
-
-    private String apiKey = "";
-
-    private String model = "deepseek-chat";
-
-    /** API 端点路径，默认 /v1/chat/completions，Anthropic 兼容填 /v1/messages */
-    private String apiEndpoint = "/v1/chat/completions";
+    /** API 端点路径 */
+    private String apiEndpoint = "/v1/messages";
 
     private int connectTimeoutMs = 30_000;
 
     private int readTimeoutMs = 300_000;
 
-    /** 参与上下文的历史消息条数（user+assistant 各算一条，不含 system） */
+    /** 参与上下文的历史消息条数 */
     private int maxContextMessages = 24;
 
     private Persona persona = new Persona();
 
     private Risk risk = new Risk();
 
+    public AiChatProperties(ModelConfigService modelConfigService) {
+        this.modelConfigService = modelConfigService;
+    }
+
+    /**
+     * 获取 API Base，从数据库读取
+     */
+    public String getEffectiveApiBase() {
+        return getDbConfig().getApiBase();
+    }
+
+    /**
+     * 获取 API Key，从数据库读取
+     */
+    public String getEffectiveApiKey() {
+        return getDbConfig().getApiKeyCipher();
+    }
+
+    /**
+     * 获取模型名称，从数据库读取
+     */
+    public String getEffectiveModel() {
+        return getDbConfig().getModelName();
+    }
+
+    /**
+     * 获取 Provider，从数据库读取
+     */
+    public String getEffectiveProvider() {
+        return "openai-compatible";
+    }
+
+    /**
+     * 检查是否有启用的模型配置
+     */
+    public boolean hasActiveConfig() {
+        try {
+            boolean result = modelConfigService.getActiveConfig().isPresent();
+            log.info("检查模型配置: hasActiveConfig={}", result);
+            return result;
+        } catch (Exception e) {
+            log.error("检查模型配置异常", e);
+            return false;
+        }
+    }
+
+    private ModelConfig getDbConfig() {
+        return modelConfigService.getActiveConfig()
+                .orElseThrow(() -> new IllegalStateException("没有启用的模型配置，请在管理后台配置模型"));
+    }
+
     @Data
     public static class Persona {
-        /** 优先读取该 classpath 文件（UTF-8） */
         private String systemPromptFile = "classpath:prompts/treehole-persona.txt";
-        /** 非空时覆盖文件内容（适合部署时注入长文本） */
         private String systemPrompt = "";
     }
 
     @Data
     public static class Risk {
         private boolean enabled = true;
-        /** 命中即视为 HIGH，走安全回复 + 预警 */
         private List<String> highKeywords = defaultHighKeywords();
-        /** 非空时覆盖下方文件 */
         private String safeReplyText = "";
-        /** 高风险固定安抚话术文件 */
         private String safeReplyFile = "classpath:prompts/safe-reply-high-risk.txt";
     }
 
