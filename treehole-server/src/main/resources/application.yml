@@ -13,14 +13,6 @@ spring:
 # JWT（生产环境请用环境变量覆盖 secret）
 app:
   ai:
-    provider: openai-compatible
-    api-base: https://api.minimaxi.com/anthropic
-    api-key: ${AI_API_KEY:}
-    model: MiniMax M2.5
-    api-endpoint: /v1/messages
-    connect-timeout-ms: 30000
-    read-timeout-ms: 300000
-    max-context-messages: 24
     persona:
       system-prompt-file: classpath:prompts/treehole-persona.txt
       system-prompt: ""

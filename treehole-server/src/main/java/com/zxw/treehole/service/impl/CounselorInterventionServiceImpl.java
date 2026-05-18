@@ -4,9 +4,11 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zxw.treehole.common.PageResult;
 import com.zxw.treehole.dto.CounselorInterventionPageQuery;
+import com.zxw.treehole.entity.CounselorClass;
 import com.zxw.treehole.entity.InterventionRecord;
 import com.zxw.treehole.entity.SysUser;
 import com.zxw.treehole.entity.WarningRecord;
+import com.zxw.treehole.mapper.CounselorClassMapper;
 import com.zxw.treehole.mapper.InterventionRecordMapper;
 import com.zxw.treehole.mapper.SysUserMapper;
 import com.zxw.treehole.mapper.WarningRecordMapper;
@@ -28,14 +30,18 @@ public class CounselorInterventionServiceImpl implements CounselorInterventionSe
     private final InterventionRecordMapper interventionRecordMapper;
     private final SysUserMapper sysUserMapper;
     private final WarningRecordMapper warningRecordMapper;
+    private final CounselorClassMapper counselorClassMapper;
 
     @Override
     public PageResult<InterventionListItemVo> pageInterventions(Long counselorUserId, CounselorInterventionPageQuery query) {
-        // 查询辅导员的班级
-        SysUser counselor = sysUserMapper.selectById(counselorUserId);
-        String className = counselor != null ? counselor.getClassName() : null;
+        // 查询辅导员管辖的班级
+        List<String> classes = counselorClassMapper.selectList(
+                new LambdaQueryWrapper<CounselorClass>()
+                        .eq(CounselorClass::getCounselorUserId, counselorUserId)
+                        .eq(CounselorClass::getDeleted, 0))
+                .stream().map(CounselorClass::getClassName).toList();
 
-        if (className == null || className.isBlank()) {
+        if (classes.isEmpty()) {
             Page<InterventionRecord> empty = new Page<>(query.getPageNum(), query.getPageSize(), 0);
             empty.setRecords(List.of());
             Page<InterventionListItemVo> voEmpty = new Page<>(empty.getCurrent(), empty.getSize(), empty.getTotal());
@@ -44,7 +50,7 @@ public class CounselorInterventionServiceImpl implements CounselorInterventionSe
         }
 
         LambdaQueryWrapper<SysUser> sw = new LambdaQueryWrapper<SysUser>()
-                .eq(SysUser::getClassName, className)
+                .in(SysUser::getClassName, classes)
                 .eq(SysUser::getDeleted, 0)
                 .inSql(SysUser::getId,
                         "SELECT user_id FROM sys_user_role WHERE role_id = (SELECT id FROM sys_role WHERE role_code = 'STUDENT')");

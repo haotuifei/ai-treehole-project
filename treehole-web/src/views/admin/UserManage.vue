@@ -159,7 +159,7 @@
         <el-form-item label="学号">
           <el-input v-model="form.studentNo" placeholder="学号" />
         </el-form-item>
-        <el-form-item label="班级">
+        <el-form-item v-if="!isCounselorRole" label="班级">
           <el-input v-model="form.className" placeholder="班级名称" />
         </el-form-item>
         <el-form-item label="角色" prop="roleIds">
@@ -171,6 +171,33 @@
               :value="role.id"
             />
           </el-select>
+        </el-form-item>
+        <el-form-item v-if="isCounselorRole && isEdit" label="管辖班级">
+          <div class="class-manage">
+            <div class="class-tags">
+              <el-tag
+                v-for="(cls, idx) in counselorClasses"
+                :key="cls"
+                closable
+                type="success"
+                size="small"
+                @close="removeClass(idx)"
+              >
+                {{ cls }}
+              </el-tag>
+              <span v-if="!counselorClasses.length" class="text-muted">暂未分配班级</span>
+            </div>
+            <div class="class-input">
+              <el-input
+                v-model="newClassName"
+                placeholder="输入班级名称"
+                size="small"
+                style="width: 200px"
+                @keyup.enter="addClass"
+              />
+              <el-button type="primary" size="small" @click="addClass">添加</el-button>
+            </div>
+          </div>
         </el-form-item>
         <el-form-item label="状态">
           <el-radio-group v-model="form.status">
@@ -190,10 +217,13 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { pageUsers, createUser, updateUser, deleteUser, listRoles } from '../../api/admin'
+import {
+  pageUsers, createUser, updateUser, deleteUser, listRoles,
+  getCounselorClasses, syncCounselorClasses
+} from '../../api/admin'
 
 const loading = ref(false)
 const submitting = ref(false)
@@ -204,6 +234,11 @@ const dialogVisible = ref(false)
 const isEdit = ref(false)
 const editId = ref(null)
 const formRef = ref(null)
+
+// 辅导员班级管理
+const counselorClasses = ref([])
+const newClassName = ref('')
+const counselorRoleId = ref(null)
 
 const query = reactive({
   pageNum: 1,
@@ -226,6 +261,19 @@ const getDefaultForm = () => ({
 })
 
 const form = reactive(getDefaultForm())
+
+const isCounselorRole = computed(() => {
+  return counselorRoleId.value && form.roleIds.includes(counselorRoleId.value)
+})
+
+watch(() => form.roleIds, async (newVal) => {
+  if (isEdit.value && newVal.includes(counselorRoleId.value) && counselorClasses.value.length === 0) {
+    try {
+      const res = await getCounselorClasses(editId.value)
+      counselorClasses.value = res.data.data || []
+    } catch { /* ignore */ }
+  }
+})
 
 const rules = {
   username: [
@@ -275,6 +323,8 @@ async function fetchRoles() {
   try {
     const res = await listRoles()
     allRoles.value = res.data.data || []
+    const counselor = allRoles.value.find(r => r.roleCode === 'COUNSELOR')
+    if (counselor) counselorRoleId.value = counselor.id
   } catch (e) {
     console.error('加载角色失败', e)
   }
@@ -296,6 +346,8 @@ function handleReset() {
 function openCreate() {
   isEdit.value = false
   editId.value = null
+  counselorClasses.value = []
+  newClassName.value = ''
   Object.assign(form, getDefaultForm())
   dialogVisible.value = true
 }
@@ -303,6 +355,8 @@ function openCreate() {
 async function openEdit(row) {
   isEdit.value = true
   editId.value = row.id
+  counselorClasses.value = []
+  newClassName.value = ''
   Object.assign(form, {
     username: row.username,
     password: '',
@@ -317,6 +371,15 @@ async function openEdit(row) {
   const codeToId = {}
   allRoles.value.forEach(r => { codeToId[r.roleCode] = r.id })
   form.roleIds = (row.roleCodes || []).map(c => codeToId[c]).filter(Boolean)
+
+  // 如果是辅导员，加载管辖班级
+  if (form.roleIds.includes(counselorRoleId.value)) {
+    try {
+      const res = await getCounselorClasses(row.id)
+      counselorClasses.value = res.data.data || []
+    } catch { counselorClasses.value = [] }
+  }
+
   dialogVisible.value = true
 }
 
@@ -334,6 +397,10 @@ async function handleSubmit() {
       const payload = { ...form }
       if (!payload.password) delete payload.password
       await updateUser(editId.value, payload)
+      // 如果是辅导员，同步管辖班级
+      if (form.roleIds.includes(counselorRoleId.value)) {
+        await syncCounselorClasses(editId.value, counselorClasses.value)
+      }
       ElMessage.success('更新成功')
     } else {
       await createUser(form)
@@ -346,6 +413,21 @@ async function handleSubmit() {
   } finally {
     submitting.value = false
   }
+}
+
+function addClass() {
+  const name = newClassName.value.trim()
+  if (!name) return
+  if (counselorClasses.value.includes(name)) {
+    ElMessage.warning('该班级已存在')
+    return
+  }
+  counselorClasses.value.push(name)
+  newClassName.value = ''
+}
+
+function removeClass(index) {
+  counselorClasses.value.splice(index, 1)
 }
 
 async function handleDelete(row) {
@@ -395,5 +477,27 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
   padding: 16px 0 4px;
+}
+
+.class-manage {
+  width: 100%;
+}
+
+.class-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.class-input {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.text-muted {
+  color: var(--th-text-muted);
+  font-size: 13px;
 }
 </style>

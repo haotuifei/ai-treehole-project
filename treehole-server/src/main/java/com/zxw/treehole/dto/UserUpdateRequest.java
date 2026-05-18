@@ -21,8 +21,7 @@ public class UserUpdateRequest {
     @Schema(description = "0 禁用 1 正常")
     private Integer status;
 
-    @Size(min = 6, max = 64, message = "新密码长度 6-64")
-    @Schema(description = "新密码，可选")
+    @Schema(description = "新密码，可选，留空或不传则不修改")
     private String password;
 
     @Schema(description = "若传入则全量替换用户角色（至少保留一个角色）")

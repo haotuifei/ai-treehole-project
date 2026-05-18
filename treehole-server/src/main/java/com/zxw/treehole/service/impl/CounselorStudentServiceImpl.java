@@ -32,16 +32,20 @@ public class CounselorStudentServiceImpl implements CounselorStudentService {
     private final WarningRecordMapper warningRecordMapper;
     private final StudyGoalMapper studyGoalMapper;
     private final StudyCheckinMapper studyCheckinMapper;
+    private final CounselorClassMapper counselorClassMapper;
 
-    private String getCounselorClassName(Long counselorUserId) {
-        SysUser counselor = sysUserMapper.selectById(counselorUserId);
-        return counselor != null ? counselor.getClassName() : null;
+    private List<String> getCounselorClasses(Long counselorUserId) {
+        return counselorClassMapper.selectList(
+                new LambdaQueryWrapper<CounselorClass>()
+                        .eq(CounselorClass::getCounselorUserId, counselorUserId)
+                        .eq(CounselorClass::getDeleted, 0))
+                .stream().map(CounselorClass::getClassName).toList();
     }
 
     @Override
     public PageResult<StudentProfileVo> pageStudents(Long counselorUserId, CounselorStudentPageQuery query) {
-        String className = getCounselorClassName(counselorUserId);
-        if (className == null || className.isBlank()) {
+        List<String> classes = getCounselorClasses(counselorUserId);
+        if (classes.isEmpty()) {
             Page<SysUser> empty = new Page<>(query.getPageNum(), query.getPageSize(), 0);
             empty.setRecords(List.of());
             Page<StudentProfileVo> voEmpty = new Page<>(empty.getCurrent(), empty.getSize(), empty.getTotal());
@@ -50,7 +54,7 @@ public class CounselorStudentServiceImpl implements CounselorStudentService {
         }
 
         LambdaQueryWrapper<SysUser> qw = new LambdaQueryWrapper<SysUser>()
-                .eq(SysUser::getClassName, className)
+                .in(SysUser::getClassName, classes)
                 .eq(SysUser::getDeleted, 0)
                 .inSql(SysUser::getId,
                         "SELECT user_id FROM sys_user_role WHERE role_id = (SELECT id FROM sys_role WHERE role_code = 'STUDENT')");
@@ -76,8 +80,8 @@ public class CounselorStudentServiceImpl implements CounselorStudentService {
         if (student == null || (student.getDeleted() != null && student.getDeleted() == 1)) {
             throw new BusinessException("学生不存在");
         }
-        String className = getCounselorClassName(counselorUserId);
-        if (student.getClassName() == null || !student.getClassName().equals(className)) {
+        List<String> classes = getCounselorClasses(counselorUserId);
+        if (student.getClassName() == null || !classes.contains(student.getClassName())) {
             throw new BusinessException(ResultCode.FORBIDDEN.getCode(), "无权查看该学生档案");
         }
 

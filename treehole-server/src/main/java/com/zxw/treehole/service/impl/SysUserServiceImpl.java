@@ -144,7 +144,11 @@ public class SysUserServiceImpl implements SysUserService {
             user.setStatus(request.getStatus());
         }
         if (StringUtils.hasText(request.getPassword())) {
-            user.setPassword(passwordEncoder.encode(request.getPassword()));
+            String pwd = request.getPassword();
+            if (pwd.length() < 6 || pwd.length() > 64) {
+                throw new BusinessException("新密码长度 6-64");
+            }
+            user.setPassword(passwordEncoder.encode(pwd));
         }
         sysUserMapper.updateById(user);
         if (request.getRoleIds() != null) {

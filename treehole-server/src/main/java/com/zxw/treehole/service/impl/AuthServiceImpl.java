@@ -43,6 +43,14 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public LoginVo login(LoginRequest request) {
+        // 先检查用户是否被禁用
+        SysUser checkUser = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUser>()
+                .eq(SysUser::getUsername, request.getUsername())
+                .eq(SysUser::getDeleted, 0));
+        if (checkUser != null && checkUser.getStatus() != null && checkUser.getStatus() == 0) {
+            throw new BusinessException("账号已被禁用，请联系管理员");
+        }
+
         Authentication auth = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
         LoginUser loginUser = (LoginUser) auth.getPrincipal();

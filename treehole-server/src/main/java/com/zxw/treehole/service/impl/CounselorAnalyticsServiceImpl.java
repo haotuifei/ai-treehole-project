@@ -27,20 +27,24 @@ public class CounselorAnalyticsServiceImpl implements CounselorAnalyticsService 
     private final EmotionRecordMapper emotionRecordMapper;
     private final WarningRecordMapper warningRecordMapper;
     private final StudyCheckinMapper studyCheckinMapper;
+    private final CounselorClassMapper counselorClassMapper;
 
     @Override
     public ClassAnalyticsVo getClassAnalytics(Long counselorUserId) {
         ClassAnalyticsVo vo = new ClassAnalyticsVo();
 
-        // 查询辅导员的班级
-        SysUser counselor = sysUserMapper.selectById(counselorUserId);
-        String className = counselor != null ? counselor.getClassName() : null;
+        // 查询辅导员管辖的班级
+        List<String> classes = counselorClassMapper.selectList(
+                new LambdaQueryWrapper<CounselorClass>()
+                        .eq(CounselorClass::getCounselorUserId, counselorUserId)
+                        .eq(CounselorClass::getDeleted, 0))
+                .stream().map(CounselorClass::getClassName).toList();
 
         // 查询管辖学生（仅学生角色）
-        List<SysUser> students = (className == null || className.isBlank()) ? List.of()
+        List<SysUser> students = classes.isEmpty() ? List.of()
                 : sysUserMapper.selectList(
                         new LambdaQueryWrapper<SysUser>()
-                                .eq(SysUser::getClassName, className)
+                                .in(SysUser::getClassName, classes)
                                 .eq(SysUser::getDeleted, 0)
                                 .inSql(SysUser::getId,
                                         "SELECT user_id FROM sys_user_role WHERE role_id = (SELECT id FROM sys_role WHERE role_code = 'STUDENT')"));

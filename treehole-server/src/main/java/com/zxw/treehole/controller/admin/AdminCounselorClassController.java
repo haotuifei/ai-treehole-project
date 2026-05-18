@@ -106,10 +106,8 @@ public class AdminCounselorClassController {
     @Operation(summary = "批量同步辅导员的管辖班级")
     @PutMapping("/{counselorUserId}")
     public Result<Void> syncClasses(@PathVariable Long counselorUserId, @RequestBody List<String> classNames) {
-        // 删除原有班级
-        counselorClassMapper.delete(
-                new LambdaQueryWrapper<CounselorClass>()
-                        .eq(CounselorClass::getCounselorUserId, counselorUserId));
+        // 物理删除原有班级（避免软删除导致唯一约束冲突）
+        counselorClassMapper.physicalDeleteByCounselorId(counselorUserId);
         // 插入新班级
         for (String name : classNames) {
             if (name != null && !name.isBlank()) {

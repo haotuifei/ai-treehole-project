@@ -34,6 +34,9 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         if (user == null) {
             throw new UsernameNotFoundException("用户不存在");
         }
+        if (user.getStatus() != null && user.getStatus() == 0) {
+            throw new UsernameNotFoundException("账号已被禁用");
+        }
         List<Long> roleIds = sysUserRoleMapper.selectList(new LambdaQueryWrapper<SysUserRole>()
                         .eq(SysUserRole::getUserId, user.getId()))
                 .stream()

@@ -7,11 +7,13 @@ import com.zxw.treehole.common.ResultCode;
 import com.zxw.treehole.dto.CounselorWarningPageQuery;
 import com.zxw.treehole.dto.InterventionCreateRequest;
 import com.zxw.treehole.dto.WarningStatusUpdateRequest;
+import com.zxw.treehole.entity.CounselorClass;
 import com.zxw.treehole.entity.EmotionRecord;
 import com.zxw.treehole.entity.InterventionRecord;
 import com.zxw.treehole.entity.SysUser;
 import com.zxw.treehole.entity.WarningRecord;
 import com.zxw.treehole.exception.BusinessException;
+import com.zxw.treehole.mapper.CounselorClassMapper;
 import com.zxw.treehole.mapper.EmotionRecordMapper;
 import com.zxw.treehole.mapper.InterventionRecordMapper;
 import com.zxw.treehole.mapper.SysUserMapper;
@@ -43,23 +45,27 @@ public class CounselorWarningServiceImpl implements CounselorWarningService {
     private final EmotionRecordMapper emotionRecordMapper;
     private final InterventionRecordMapper interventionRecordMapper;
     private final SysUserMapper sysUserMapper;
+    private final CounselorClassMapper counselorClassMapper;
 
-    private String getCounselorClassName(Long counselorUserId) {
-        SysUser counselor = sysUserMapper.selectById(counselorUserId);
-        return counselor != null ? counselor.getClassName() : null;
+    private List<String> getCounselorClasses(Long counselorUserId) {
+        return counselorClassMapper.selectList(
+                new LambdaQueryWrapper<CounselorClass>()
+                        .eq(CounselorClass::getCounselorUserId, counselorUserId)
+                        .eq(CounselorClass::getDeleted, 0))
+                .stream().map(CounselorClass::getClassName).toList();
     }
 
     @Override
     public PageResult<WarningListItemVo> pageWarnings(Long counselorUserId, CounselorWarningPageQuery query) {
-        String className = getCounselorClassName(counselorUserId);
-        if (className == null || className.isBlank()) {
+        List<String> classes = getCounselorClasses(counselorUserId);
+        if (classes.isEmpty()) {
             Page<WarningListItemVo> empty = new Page<>(query.getPageNum(), query.getPageSize(), 0);
             empty.setRecords(List.of());
             return PageResult.of(empty);
         }
 
         LambdaQueryWrapper<SysUser> uw = new LambdaQueryWrapper<SysUser>()
-                .eq(SysUser::getClassName, className)
+                .in(SysUser::getClassName, classes)
                 .eq(SysUser::getDeleted, 0)
                 .inSql(SysUser::getId,
                         "SELECT user_id FROM sys_user_role WHERE role_id = (SELECT id FROM sys_role WHERE role_code = 'STUDENT')");
@@ -190,8 +196,8 @@ public class CounselorWarningServiceImpl implements CounselorWarningService {
         if (st == null || (st.getDeleted() != null && st.getDeleted() == 1)) {
             throw new BusinessException("学生不存在");
         }
-        String className = getCounselorClassName(counselorUserId);
-        if (st.getClassName() == null || !st.getClassName().equals(className)) {
+        List<String> classes = getCounselorClasses(counselorUserId);
+        if (st.getClassName() == null || !classes.contains(st.getClassName())) {
             throw new BusinessException(ResultCode.FORBIDDEN.getCode(), "无权查看该学生预警");
         }
     }

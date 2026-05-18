@@ -2,10 +2,12 @@ package com.zxw.treehole.bootstrap;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zxw.treehole.entity.AlertRule;
+import com.zxw.treehole.entity.CounselorClass;
 import com.zxw.treehole.entity.SysRole;
 import com.zxw.treehole.entity.SysUser;
 import com.zxw.treehole.entity.SysUserRole;
 import com.zxw.treehole.mapper.AlertRuleMapper;
+import com.zxw.treehole.mapper.CounselorClassMapper;
 import com.zxw.treehole.mapper.SysRoleMapper;
 import com.zxw.treehole.mapper.SysUserMapper;
 import com.zxw.treehole.mapper.SysUserRoleMapper;
@@ -33,6 +35,7 @@ public class DataInitializer implements ApplicationRunner {
     private final SysUserMapper sysUserMapper;
     private final SysUserRoleMapper sysUserRoleMapper;
     private final AlertRuleMapper alertRuleMapper;
+    private final CounselorClassMapper counselorClassMapper;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -132,11 +135,18 @@ public class DataInitializer implements ApplicationRunner {
                 sysUserMapper.updateById(st);
                 log.info("已将演示学生 student 的班级设为「演示班级」");
             }
-            // 给辅导员设置班级（与学生一致）
-            if (co.getClassName() == null || co.getClassName().isBlank()) {
-                co.setClassName("演示班级");
-                sysUserMapper.updateById(co);
-                log.info("已将辅导员 counselor 的班级设为「演示班级」");
+            // 给辅导员分配班级（通过 counselor_class 表）
+            Long exists = counselorClassMapper.selectCount(
+                    new LambdaQueryWrapper<CounselorClass>()
+                            .eq(CounselorClass::getCounselorUserId, co.getId())
+                            .eq(CounselorClass::getClassName, "演示班级")
+                            .eq(CounselorClass::getDeleted, 0));
+            if (exists == null || exists == 0) {
+                CounselorClass cc = new CounselorClass();
+                cc.setCounselorUserId(co.getId());
+                cc.setClassName("演示班级");
+                counselorClassMapper.insert(cc);
+                log.info("已将辅导员 counselor 关联到「演示班级」");
             }
         }
     }
